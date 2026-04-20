@@ -150,7 +150,8 @@ curl http://localhost:8000/documents/collection/rag_demo
 RAG/
 ├── docker-compose.yml
 ├── Dockerfile
-├── requirements.txt
+├── pyproject.toml              ← uv project & dependencies
+├── uv.lock                     ← lockfile (auto-generated)
 ├── .env.example
 ├── sample_data/
 │   ├── thai_ai_knowledge.txt    ← ตัวอย่างภาษาไทย
@@ -175,12 +176,14 @@ RAG/
 # รัน Qdrant ด้วย Docker
 docker run -p 6333:6333 -p 6334:6334 qdrant/qdrant
 
-# Install dependencies
-pip install -r requirements.txt
-
 # Copy และแก้ .env
 cp .env.example .env
 
+# Install dependencies ด้วย uv
+uv sync
+
 # รัน FastAPI
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+> ติดตั้ง uv: `curl -LsSf https://astral.sh/uv/install.sh | sh`
