@@ -1,0 +1,57 @@
+Introduction to Retrieval-Augmented Generation (RAG)
+
+Retrieval-Augmented Generation (RAG) is an AI framework that combines the power of large language models (LLMs) with the ability to retrieve information from external knowledge bases. This approach addresses one of the key limitations of LLMs: their knowledge is static and limited to their training data cutoff.
+
+How RAG Works
+
+The RAG pipeline consists of two main phases: indexing and retrieval-generation.
+
+During the indexing phase, documents are split into smaller chunks, converted into vector embeddings using an embedding model, and stored in a vector database. Each embedding is a high-dimensional numerical representation that captures the semantic meaning of the text.
+
+During the retrieval-generation phase, when a user submits a query, it is also converted into a vector embedding. The system then searches the vector database for the most semantically similar chunks using metrics like cosine similarity or dot product. The retrieved chunks are then combined with the original query and passed to the LLM as context.
+
+Vector Embeddings Explained
+
+Vector embeddings are numerical representations of text in a high-dimensional space. Similar pieces of text will have embeddings that are close together in this vector space. For example, the sentences "The cat sat on the mat" and "A feline rested on the rug" would have similar embeddings because they convey similar meanings.
+
+Multilingual embedding models, such as paraphrase-multilingual-MiniLM-L12-v2, can create embeddings for text in multiple languages, including Thai, Japanese, Chinese, and many European languages, all within the same vector space.
+
+Qdrant: A High-Performance Vector Database
+
+Qdrant is an open-source vector similarity search engine and vector database written in Rust. It provides a production-ready service with a convenient API to store, search, and manage points (vectors with an optional payload).
+
+Key features of Qdrant include:
+- Fast and accurate vector similarity search
+- Support for filtering based on payload metadata
+- Horizontal scalability for large datasets
+- Built-in support for cosine similarity, dot product, and Euclidean distance
+- REST API and gRPC interface
+- Docker support for easy deployment
+
+Chunking Strategies for RAG
+
+Effective chunking is crucial for RAG performance. Common strategies include:
+
+Fixed-size chunking divides text into chunks of a predetermined number of characters or tokens with optional overlap between consecutive chunks. This is simple but may cut text in the middle of sentences.
+
+Semantic chunking splits text based on semantic boundaries such as paragraphs, sections, or topic shifts. This preserves the context and meaning of each chunk but can result in variable chunk sizes.
+
+Sentence-level chunking treats each sentence as a separate chunk. This provides fine-grained retrieval but may lack sufficient context for the LLM.
+
+Evaluating RAG Performance
+
+Key metrics for evaluating RAG systems include:
+- Retrieval precision: How many of the retrieved documents are relevant?
+- Retrieval recall: What fraction of relevant documents were retrieved?
+- Answer faithfulness: Does the generated answer stay true to the retrieved context?
+- Answer relevance: Does the answer actually address the user's question?
+
+Best Practices for RAG Implementation
+
+Choose the right embedding model for your use case. Multilingual models are essential when dealing with non-English content. Models like sentence-transformers provide a good balance between speed and accuracy.
+
+Optimize your chunk size based on your documents and queries. Smaller chunks provide more precise retrieval, while larger chunks provide more context for the LLM.
+
+Use metadata filtering to narrow down the search space when you have documents from multiple sources or time periods.
+
+Implement re-ranking to improve the quality of retrieved results by applying a more powerful cross-encoder model as a second stage after initial retrieval.

@@ -1,0 +1,49 @@
+from pydantic import BaseModel, Field
+from typing import Optional
+
+
+class IngestRequest(BaseModel):
+    collection_name: Optional[str] = None
+    source_name: Optional[str] = Field(None, description="ชื่อไฟล์หรือแหล่งข้อมูล")
+
+
+class IngestResponse(BaseModel):
+    message: str
+    chunks_stored: int
+    collection: str
+    source: str
+
+
+class SearchRequest(BaseModel):
+    query: str = Field(..., description="คำถามหรือข้อความที่ต้องการค้นหา")
+    top_k: Optional[int] = Field(None, description="จำนวนผลลัพธ์ที่ต้องการ")
+    collection_name: Optional[str] = None
+    score_threshold: float = Field(0.0, description="คะแนนขั้นต่ำ (0.0 - 1.0)")
+
+
+class RetrievedChunk(BaseModel):
+    text: str
+    score: float
+    source: str
+    chunk_index: int
+
+
+class SearchResponse(BaseModel):
+    query: str
+    results: list[RetrievedChunk]
+    total_found: int
+
+
+class RAGRequest(BaseModel):
+    query: str = Field(..., description="คำถามที่ต้องการถาม")
+    top_k: Optional[int] = None
+    collection_name: Optional[str] = None
+    score_threshold: float = 0.0
+
+
+class RAGResponse(BaseModel):
+    query: str
+    answer: str
+    retrieved_chunks: list[RetrievedChunk]
+    model_used: Optional[str] = None
+    has_llm_response: bool = False
