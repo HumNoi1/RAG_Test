@@ -1,10 +1,41 @@
 from fastapi import APIRouter, HTTPException
 from app.models import SearchRequest, SearchResponse, RAGRequest, RAGResponse
-from app.rag_pipeline import retrieve, rag_with_llm
-import logging
+from app.rag_pipeline import MissingLLMApiKeyError, rag_with_llm, retrieve
+from app.vector_store import (
+    CollectionDimensionMismatchError,
+    CollectionNotFoundError,
+    QdrantUnavailableError,
+)
 
-logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/query", tags=["Query & RAG"])
+
+
+def _retrieve_or_raise(
+    query: str,
+    collection_name: str | None,
+    top_k: int | None,
+    score_threshold: float,
+):
+    try:
+        return retrieve(
+            query=query,
+            collection_name=collection_name,
+            top_k=top_k,
+            score_threshold=score_threshold,
+        )
+    except CollectionDimensionMismatchError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except CollectionNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except QdrantUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+def _format_retrieved_chunks(chunks) -> str:
+    return "\n\n".join(
+        f"[{i+1}] Score: {chunk.score:.4f} | Source: {chunk.source}\n{chunk.text}"
+        for i, chunk in enumerate(chunks)
+    )
 
 
 @router.post("/search", response_model=SearchResponse, summary="ค้นหา chunks ที่เกี่ยวข้องจาก Qdrant")
@@ -18,15 +49,12 @@ async def semantic_search(body: SearchRequest):
     - **source**: ชื่อไฟล์ต้นทาง
     - **chunk_index**: ลำดับของ chunk ในเอกสาร
     """
-    try:
-        chunks = retrieve(
-            query=body.query,
-            collection_name=body.collection_name,
-            top_k=body.top_k,
-            score_threshold=body.score_threshold,
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Search error: {str(e)}")
+    chunks = _retrieve_or_raise(
+        query=body.query,
+        collection_name=body.collection_name,
+        top_k=body.top_k,
+        score_threshold=body.score_threshold,
+    )
 
     return SearchResponse(
         query=body.query,
@@ -40,22 +68,19 @@ async def rag_query(body: RAGRequest):
     """
     **RAG Pipeline**: ค้นหา relevant chunks แล้วส่งให้ LLM สร้างคำตอบ
 
-    - ถ้ามี `OPENAI_API_KEY` → ใช้ GPT-4o-mini ตอบ
+    - ถ้ามี `GROQ_API_KEY` → ใช้ Groq ตอบ
     - ถ้าไม่มี key → return เฉพาะ retrieved chunks (no LLM)
 
     ดูได้ว่า:
     1. Embedding ดึงข้อมูลอะไรออกมา (retrieved_chunks)
     2. LLM สร้างคำตอบจาก context อย่างไร (answer)
     """
-    try:
-        chunks = retrieve(
-            query=body.query,
-            collection_name=body.collection_name,
-            top_k=body.top_k,
-            score_threshold=body.score_threshold,
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Retrieval error: {str(e)}")
+    chunks = _retrieve_or_raise(
+        query=body.query,
+        collection_name=body.collection_name,
+        top_k=body.top_k,
+        score_threshold=body.score_threshold,
+    )
 
     if not chunks:
         return RAGResponse(
@@ -75,17 +100,13 @@ async def rag_query(body: RAGRequest):
             model_used=model_name,
             has_llm_response=True,
         )
-    except ValueError:
-        # ไม่มี OpenAI key — return แค่ retrieved chunks
-        context_summary = "\n\n".join(
-            f"[{i+1}] Score: {c.score:.4f} | Source: {c.source}\n{c.text}"
-            for i, c in enumerate(chunks)
-        )
+    except MissingLLMApiKeyError:
+        # ไม่มี Groq API key — return แค่ retrieved chunks
         return RAGResponse(
             query=body.query,
             answer=(
-                "⚠️ ไม่มี OPENAI_API_KEY — แสดงเฉพาะ Retrieved Chunks:\n\n"
-                + context_summary
+                "⚠️ ไม่มี GROQ_API_KEY — แสดงเฉพาะ Retrieved Chunks:\n\n"
+                + _format_retrieved_chunks(chunks)
             ),
             retrieved_chunks=chunks,
             has_llm_response=False,

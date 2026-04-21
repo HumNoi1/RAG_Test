@@ -38,7 +38,7 @@ app = FastAPI(
 3. **RAG** รับคำตอบจาก LLM ผ่าน `/query/rag`
 
 ### Embedding Model
-`paraphrase-multilingual-MiniLM-L12-v2` — รองรับ 50+ ภาษา รวมถึงภาษาไทย
+`BAAI/bge-m3` — multilingual embedding model (1024 dim)
 
 ### Vector Database
 Qdrant — running in Docker
@@ -64,6 +64,8 @@ async def root():
         "message": "RAG Demo API is running! 🚀",
         "docs": "/docs",
         "embedding_model": settings.embedding_model,
+        "llm_provider": "groq",
+        "llm_model": settings.llm_model,
         "qdrant": f"{settings.qdrant_host}:{settings.qdrant_port}",
         "collection": settings.qdrant_collection,
     }

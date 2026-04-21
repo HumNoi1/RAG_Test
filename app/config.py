@@ -1,15 +1,17 @@
-from pydantic_settings import BaseSettings
 from functools import lru_cache
+
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     qdrant_host: str = "localhost"
     qdrant_port: int = 6333
-    qdrant_collection: str = "rag_demo"
+    qdrant_collection: str = "rag_demo_bge_m3"
 
-    embedding_model: str = "paraphrase-multilingual-MiniLM-L12-v2"
+    embedding_model: str = "BAAI/bge-m3"
 
-    openai_api_key: str = ""
+    llm_model: str = "qwen/qwen3-32b"
+    groq_api_key: str = ""
 
     chunk_size: int = 500
     chunk_overlap: int = 50

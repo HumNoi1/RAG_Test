@@ -5,6 +5,10 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
 
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    HF_HOME=/root/.cache/huggingface
+
 # Install system dependencies required by some ML packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \

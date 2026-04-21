@@ -8,6 +8,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class MissingLLMApiKeyError(RuntimeError):
+    """Raised when the configured LLM provider has no API key."""
+
+
 def chunk_text(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
     """
     แบ่งข้อความเป็น chunks โดยพยายามตัดที่ขอบประโยค/ย่อหน้า
@@ -116,16 +120,15 @@ def rag_with_llm(
     chunks: list[RetrievedChunk],
 ) -> tuple[str, str]:
     """
-    ส่ง retrieved chunks + query ไปให้ OpenAI แล้ว return (answer, model_name)
-    ถ้าไม่มี API key จะ raise ValueError
+    ส่ง retrieved chunks + query ไปให้ Groq แล้ว return (answer, model_name)
     """
-    from openai import OpenAI
+    from groq import Groq
 
     settings = get_settings()
-    if not settings.openai_api_key:
-        raise ValueError("OPENAI_API_KEY not set")
+    if not settings.groq_api_key:
+        raise MissingLLMApiKeyError("GROQ_API_KEY not set")
 
-    client = OpenAI(api_key=settings.openai_api_key)
+    client = Groq(api_key=settings.groq_api_key)
     context = build_context(chunks)
 
     system_prompt = (
@@ -138,7 +141,7 @@ def rag_with_llm(
     user_prompt = f"Context:\n{context}\n\nQuestion: {query}"
 
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=settings.llm_model,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -147,5 +150,5 @@ def rag_with_llm(
     )
 
     answer = response.choices[0].message.content
-    model_name = response.model
+    model_name = response.model or settings.llm_model
     return answer, model_name

@@ -15,18 +15,20 @@ def get_embedding_model() -> SentenceTransformer:
     return model
 
 
-def embed_texts(texts: list[str]) -> list[list[float]]:
-    """Embed a list of texts into vectors."""
+def _encode_texts(texts: list[str]) -> list[list[float]]:
     model = get_embedding_model()
     embeddings = model.encode(texts, show_progress_bar=False, normalize_embeddings=True)
     return embeddings.tolist()
 
 
+def embed_texts(texts: list[str]) -> list[list[float]]:
+    """Embed a list of texts into vectors."""
+    return _encode_texts(texts)
+
+
 def embed_query(query: str) -> list[float]:
     """Embed a single query string."""
-    model = get_embedding_model()
-    embedding = model.encode([query], normalize_embeddings=True)
-    return embedding[0].tolist()
+    return _encode_texts([query])[0]
 
 
 def get_embedding_dimension() -> int:
