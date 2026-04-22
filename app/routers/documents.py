@@ -1,6 +1,10 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
-from app.models import IngestRequest, IngestResponse
+import json
+
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+
+from app.models import ExtractTextResponse, IngestRequest, IngestResponse
 from app.rag_pipeline import ingest_text
+from app.text_extraction import UnsupportedFileTypeError, extract_text_from_file
 from app.vector_store import (
     CollectionDimensionMismatchError,
     CollectionNotFoundError,
@@ -12,13 +16,6 @@ from app.vector_store import (
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
 
-def _decode_text_content(content: bytes) -> str:
-    try:
-        return content.decode("utf-8")
-    except UnicodeDecodeError:
-        return content.decode("tis-620", errors="replace")
-
-
 def _raise_storage_http_error(exc: Exception) -> None:
     if isinstance(exc, CollectionDimensionMismatchError):
         raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -27,37 +24,80 @@ def _raise_storage_http_error(exc: Exception) -> None:
     raise exc
 
 
-@router.post("/upload-and-ingest", response_model=IngestResponse, summary="อัปโหลด .txt แล้ว embed เข้า Qdrant")
-async def upload_and_ingest(
-    file: UploadFile | None = File(None, description="ไฟล์ .txt ที่ต้องการ ingest"),
-    collection_name: str | None = None,
-):
-    """
-    อัปโหลดไฟล์ .txt → ตัด chunks → embed → บันทึกเข้า Qdrant
+def _extract_or_raise(content: bytes, filename: str) -> tuple[str, str]:
+    try:
+        return extract_text_from_file(content, filename)
+    except UnsupportedFileTypeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"ไม่สามารถอ่านข้อความจากไฟล์ '{filename}' ได้: {exc}") from exc
 
-    - **file**: ไฟล์ .txt (รองรับ UTF-8)
-    - **collection_name**: ชื่อ collection (optional, ใช้ค่า default จาก config ถ้าไม่ระบุ)
-    """
+
+def _parse_metadata(metadata: str | None) -> dict:
+    if not metadata:
+        return {}
+
+    try:
+        parsed = json.loads(metadata)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="metadata ต้องเป็น JSON object") from exc
+
+    if not isinstance(parsed, dict):
+        raise HTTPException(status_code=400, detail="metadata ต้องเป็น JSON object")
+
+    normalized = {}
+    for key, value in parsed.items():
+        if not isinstance(value, (str, int, float, bool)):
+            raise HTTPException(status_code=400, detail="metadata values ต้องเป็น string, number หรือ boolean")
+        normalized[str(key)] = value
+    return normalized
+
+
+@router.post("/extract-text", response_model=ExtractTextResponse, summary="แปลงไฟล์เป็นข้อความ")
+async def extract_text(file: UploadFile = File(..., description="ไฟล์ .txt, .pdf หรือ .docx")):
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="ต้องส่งไฟล์ผ่าน multipart/form-data โดยใช้ field ชื่อ 'file'")
+
+    content = await file.read()
+    text, file_type = _extract_or_raise(content, file.filename)
+
+    if not text.strip():
+        raise HTTPException(status_code=400, detail="ไม่พบข้อความในไฟล์")
+
+    return ExtractTextResponse(
+        source=file.filename,
+        file_type=file_type,
+        text=text,
+        characters=len(text),
+    )
+
+
+@router.post("/upload-and-ingest", response_model=IngestResponse, summary="อัปโหลด .txt/.pdf/.docx แล้ว embed เข้า Qdrant")
+async def upload_and_ingest(
+    file: UploadFile | None = File(None, description="ไฟล์ .txt, .pdf หรือ .docx ที่ต้องการ ingest"),
+    collection_name: str | None = None,
+    metadata: str | None = Form(None, description="JSON object ของ metadata เช่น {\"course_id\":\"c1\"}"),
+):
     if file is None or not file.filename:
         raise HTTPException(
             status_code=400,
             detail="ต้องส่งไฟล์ผ่าน multipart/form-data โดยใช้ field ชื่อ 'file'",
         )
 
-    if not file.filename.endswith(".txt"):
-        raise HTTPException(status_code=400, detail="รองรับเฉพาะไฟล์ .txt เท่านั้น")
-
     content = await file.read()
-    text = _decode_text_content(content)
+    text, file_type = _extract_or_raise(content, file.filename)
 
     if not text.strip():
-        raise HTTPException(status_code=400, detail="ไฟล์ว่างเปล่า")
+        raise HTTPException(status_code=400, detail="ไฟล์ว่างเปล่าหรือไม่พบข้อความที่ extract ได้")
 
+    parsed_metadata = _parse_metadata(metadata)
+    parsed_metadata["file_type"] = file_type
     try:
         stored, collection = ingest_text(
             text=text,
             source=file.filename,
             collection_name=collection_name,
+            metadata=parsed_metadata,
         )
     except (CollectionDimensionMismatchError, QdrantUnavailableError) as exc:
         _raise_storage_http_error(exc)
@@ -67,6 +107,7 @@ async def upload_and_ingest(
         chunks_stored=stored,
         collection=collection,
         source=file.filename,
+        metadata=parsed_metadata,
     )
 
 
@@ -76,7 +117,6 @@ async def ingest_raw_text(
     text: str = "",
     collection_name: str | None = None,
 ):
-    """ส่ง raw text ผ่าน body แล้ว ingest เข้า Qdrant"""
     raw_text = body.text or text
     if not raw_text.strip():
         raise HTTPException(status_code=400, detail="text ว่างเปล่า")
@@ -86,6 +126,7 @@ async def ingest_raw_text(
             text=raw_text,
             source=body.source_name or "raw_input",
             collection_name=collection_name or body.collection_name,
+            metadata=body.metadata,
         )
     except (CollectionDimensionMismatchError, QdrantUnavailableError) as exc:
         _raise_storage_http_error(exc)
@@ -95,12 +136,12 @@ async def ingest_raw_text(
         chunks_stored=stored,
         collection=collection,
         source=body.source_name or "raw_input",
+        metadata=body.metadata,
     )
 
 
 @router.get("/collection/{collection_name}", summary="ดูข้อมูล collection")
 async def collection_info(collection_name: str):
-    """ดูสถิติของ collection ใน Qdrant"""
     try:
         info = get_collection_info(collection_name)
         return info
@@ -112,7 +153,6 @@ async def collection_info(collection_name: str):
 
 @router.delete("/collection/{collection_name}", summary="ลบ collection")
 async def remove_collection(collection_name: str):
-    """ลบ collection และข้อมูลทั้งหมดออกจาก Qdrant"""
     try:
         delete_collection(collection_name)
         return {"message": f"ลบ collection '{collection_name}' สำเร็จ"}

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
-from app.models import SearchRequest, SearchResponse, RAGRequest, RAGResponse
+
+from app.models import RAGRequest, RAGResponse, SearchRequest, SearchResponse
 from app.rag_pipeline import MissingLLMApiKeyError, rag_with_llm, retrieve
 from app.vector_store import (
     CollectionDimensionMismatchError,
@@ -15,6 +16,7 @@ def _retrieve_or_raise(
     collection_name: str | None,
     top_k: int | None,
     score_threshold: float,
+    metadata_filters: dict,
 ):
     try:
         return retrieve(
@@ -22,6 +24,7 @@ def _retrieve_or_raise(
             collection_name=collection_name,
             top_k=top_k,
             score_threshold=score_threshold,
+            metadata_filters=metadata_filters,
         )
     except CollectionDimensionMismatchError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -33,27 +36,19 @@ def _retrieve_or_raise(
 
 def _format_retrieved_chunks(chunks) -> str:
     return "\n\n".join(
-        f"[{i+1}] Score: {chunk.score:.4f} | Source: {chunk.source}\n{chunk.text}"
+        f"[{i+1}] Score: {chunk.score:.4f} | Source: {chunk.source} | Chunk: {chunk.chunk_index}\n{chunk.text}"
         for i, chunk in enumerate(chunks)
     )
 
 
 @router.post("/search", response_model=SearchResponse, summary="ค้นหา chunks ที่เกี่ยวข้องจาก Qdrant")
 async def semantic_search(body: SearchRequest):
-    """
-    **Semantic Search**: embed query แล้วค้นหา chunks ที่ใกล้เคียงที่สุดใน Qdrant
-
-    Response ประกอบด้วย:
-    - **text**: เนื้อหาของ chunk
-    - **score**: คะแนน cosine similarity (0.0 – 1.0, สูง = ใกล้เคียงมาก)
-    - **source**: ชื่อไฟล์ต้นทาง
-    - **chunk_index**: ลำดับของ chunk ในเอกสาร
-    """
     chunks = _retrieve_or_raise(
         query=body.query,
         collection_name=body.collection_name,
         top_k=body.top_k,
         score_threshold=body.score_threshold,
+        metadata_filters=body.metadata_filters,
     )
 
     return SearchResponse(
@@ -65,21 +60,12 @@ async def semantic_search(body: SearchRequest):
 
 @router.post("/rag", response_model=RAGResponse, summary="RAG: ค้นหา + LLM สร้างคำตอบ")
 async def rag_query(body: RAGRequest):
-    """
-    **RAG Pipeline**: ค้นหา relevant chunks แล้วส่งให้ LLM สร้างคำตอบ
-
-    - ถ้ามี `GROQ_API_KEY` → ใช้ Groq ตอบ
-    - ถ้าไม่มี key → return เฉพาะ retrieved chunks (no LLM)
-
-    ดูได้ว่า:
-    1. Embedding ดึงข้อมูลอะไรออกมา (retrieved_chunks)
-    2. LLM สร้างคำตอบจาก context อย่างไร (answer)
-    """
     chunks = _retrieve_or_raise(
         query=body.query,
         collection_name=body.collection_name,
         top_k=body.top_k,
         score_threshold=body.score_threshold,
+        metadata_filters=body.metadata_filters,
     )
 
     if not chunks:
@@ -90,7 +76,6 @@ async def rag_query(body: RAGRequest):
             has_llm_response=False,
         )
 
-    # ลอง LLM ถ้ามี key
     try:
         answer, model_name = rag_with_llm(body.query, chunks)
         return RAGResponse(
@@ -101,7 +86,6 @@ async def rag_query(body: RAGRequest):
             has_llm_response=True,
         )
     except MissingLLMApiKeyError:
-        # ไม่มี Groq API key — return แค่ retrieved chunks
         return RAGResponse(
             query=body.query,
             answer=(
@@ -111,5 +95,5 @@ async def rag_query(body: RAGRequest):
             retrieved_chunks=chunks,
             has_llm_response=False,
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"LLM error: {str(e)}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"LLM error: {str(exc)}") from exc

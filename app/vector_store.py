@@ -1,6 +1,9 @@
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance,
+    FieldCondition,
+    Filter,
+    MatchValue,
     PointStruct,
     ScoredPoint,
     VectorParams,
@@ -11,6 +14,8 @@ from app.embeddings import get_embedding_dimension
 from functools import lru_cache
 import uuid
 import logging
+
+from app.models import MetadataValue
 
 logger = logging.getLogger(__name__)
 
@@ -103,10 +108,12 @@ def upsert_chunks(
     chunks: list[str],
     embeddings: list[list[float]],
     source: str,
+    metadata: dict[str, MetadataValue] | None = None,
 ) -> int:
     """บันทึก chunks พร้อม vectors เข้า Qdrant"""
     client = get_qdrant_client()
     ensure_collection(collection_name)
+    base_metadata = metadata or {}
 
     points = [
         PointStruct(
@@ -116,6 +123,7 @@ def upsert_chunks(
                 "text": chunk,
                 "source": source,
                 "chunk_index": i,
+                **base_metadata,
             },
         )
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings))
@@ -134,14 +142,17 @@ def search_similar(
     query_vector: list[float],
     top_k: int = 5,
     score_threshold: float = 0.0,
+    metadata_filters: dict[str, MetadataValue] | None = None,
 ) -> list[ScoredPoint]:
     """ค้นหา chunks ที่ใกล้เคียงกับ query vector"""
     client = get_qdrant_client()
     _validate_collection_dimension(collection_name, len(query_vector))
+    query_filter = build_metadata_filter(metadata_filters)
     try:
         results = client.search(
             collection_name=collection_name,
             query_vector=query_vector,
+            query_filter=query_filter,
             limit=top_k,
             score_threshold=score_threshold,
             with_payload=True,
@@ -172,3 +183,17 @@ def get_collection_info(collection_name: str) -> dict:
         "status": str(info.status),
         "vector_size": _get_collection_vector_size(info),
     }
+
+
+def build_metadata_filter(
+    metadata_filters: dict[str, MetadataValue] | None,
+) -> Filter | None:
+    if not metadata_filters:
+        return None
+
+    return Filter(
+        must=[
+            FieldCondition(key=key, match=MatchValue(value=value))
+            for key, value in metadata_filters.items()
+        ]
+    )

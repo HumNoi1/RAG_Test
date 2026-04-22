@@ -9,7 +9,7 @@ Retrieval-Augmented Generation demo ด้วย **FastAPI + Qdrant + sentence-t
 ## 🏗️ Architecture
 
 ```
-.txt File
+.txt/.pdf/.docx File
    ↓
 [Chunking]  ← ตัดข้อความเป็น chunks
    ↓
@@ -19,7 +19,7 @@ Retrieval-Augmented Generation demo ด้วย **FastAPI + Qdrant + sentence-t
    ↓
 [Query]     ← embed query → cosine similarity search
    ↓
-[LLM]       ← (optional) GPT-4o-mini สร้างคำตอบจาก context
+[LLM]       ← (optional) Groq model สร้างคำตอบ/คะแนนจาก context
 ```
 
 ---
@@ -57,6 +57,7 @@ Docker Compose จะอ่าน `QDRANT_COLLECTION`, `EMBEDDING_MODEL`, `LLM_M
 2. ไปที่ `POST /documents/upload-and-ingest`
 3. อัปโหลดไฟล์จาก `sample_data/` (เช่น `thai_ai_knowledge.txt`)
 4. ลอง query ที่ `POST /query/search` หรือ `POST /query/rag`
+5. ถ้าต้องการตรวจงาน ให้ใช้ `POST /grading/grade-submission`
 
 ### วิธีที่ 2: curl
 
@@ -86,6 +87,18 @@ curl -X POST http://localhost:8000/query/rag \
 
 # 6. ดูข้อมูล collection
 curl http://localhost:8000/documents/collection/rag_demo_bge_m3
+
+# 7. ตรวจงานด้วย rubric
+curl -X POST http://localhost:8000/grading/grade-submission \
+  -H "Content-Type: application/json" \
+  -d '{
+    "submission_text": "Machine Learning คือการทำให้คอมพิวเตอร์เรียนรู้จากข้อมูล...",
+    "assignment_title": "อธิบาย Machine Learning",
+    "rubric": [
+      {"criterion_name": "ความถูกต้อง", "description": "อธิบายแนวคิดได้ถูกต้อง", "max_score": 50},
+      {"criterion_name": "ความครบถ้วน", "description": "ครอบคลุมประเด็นสำคัญ", "max_score": 50}
+    ]
+  }'
 ```
 
 ---
@@ -195,6 +208,37 @@ uv run python -m app.evaluation \
 }
 ```
 
+### `/grading/grade-submission` Response
+
+```json
+{
+  "proposed_total_score": 82,
+  "max_score": 100,
+  "student_reason": "คำตอบครอบคลุมแนวคิดหลัก แต่ยังขาดรายละเอียดบางส่วน",
+  "internal_reason": "Submission explains the core concept correctly but misses deeper supporting detail.",
+  "rubric_breakdown": [
+    {
+      "criterion_name": "ความถูกต้อง",
+      "score": 42,
+      "max_score": 50,
+      "reason": "อธิบายแนวคิดหลักได้ถูกต้อง"
+    }
+  ],
+  "evidence": [
+    {
+      "source": "thai_ai_knowledge.txt",
+      "chunk_index": 2,
+      "quote": "...",
+      "relevance_score": 0.89,
+      "metadata": {"file_type": "txt"}
+    }
+  ],
+  "retrieved_chunks": [...],
+  "model_used": "qwen/qwen3-32b",
+  "has_llm_response": true
+}
+```
+
 ---
 
 ## ⚙️ Configuration (.env)
@@ -206,7 +250,7 @@ uv run python -m app.evaluation \
 | `QDRANT_COLLECTION` | rag_demo_bge_m3 | ชื่อ collection |
 | `EMBEDDING_MODEL` | BAAI/bge-m3 | Embedding model |
 | `LLM_MODEL` | qwen/qwen3-32b | ชื่อ model ที่จะใช้ใน `/query/rag` |
-| `GROQ_API_KEY` | (empty) | Groq API key (optional) |
+| `GROQ_API_KEY` | (empty) | Groq API key (required for grading, optional for `/query/rag`) |
 | `CHUNK_SIZE` | 500 | ขนาด chunk (ตัวอักษร) |
 | `CHUNK_OVERLAP` | 50 | overlap ระหว่าง chunks |
 | `TOP_K` | 5 | จำนวนผลลัพธ์ default |

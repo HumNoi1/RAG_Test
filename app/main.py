@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from app.routers import documents, query
+from app.routers import documents, grading, query
 from app.embeddings import get_embedding_model
 from app.config import get_settings
 import logging
@@ -33,9 +33,10 @@ app = FastAPI(
 รองรับ **ภาษาไทย** และ **English**
 
 ### Workflow
-1. **อัปโหลดไฟล์** `.txt` ผ่าน `/documents/upload-and-ingest`
+1. **อัปโหลดไฟล์** `.txt`, `.pdf`, `.docx` ผ่าน `/documents/upload-and-ingest`
 2. **ค้นหา** ด้วย semantic search ผ่าน `/query/search`
 3. **RAG** รับคำตอบจาก LLM ผ่าน `/query/rag`
+4. **Grading** ตรวจงานและคืนคะแนนเสนอผ่าน `/grading/grade-submission`
 
 ### Embedding Model
 `BAAI/bge-m3` — multilingual embedding model (1024 dim)
@@ -55,6 +56,7 @@ app.add_middleware(
 )
 
 app.include_router(documents.router)
+app.include_router(grading.router)
 app.include_router(query.router)
 
 
