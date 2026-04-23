@@ -1,0 +1,383 @@
+วิชาแนวคิดวิศวกรรมซอฟต์แวร์ (Concepts of Software Engineering)
+================================================================
+
+บทที่ 1: ความรู้เบื้องต้นเกี่ยวกับวิศวกรรมซอฟต์แวร์
+------------------------------------------------------
+
+วิศวกรรมซอฟต์แวร์ (Software Engineering) คือการประยุกต์ใช้หลักการทางวิศวกรรมในการออกแบบ พัฒนา ทดสอบ และบำรุงรักษาซอฟต์แวร์อย่างเป็นระบบ มีประสิทธิภาพ และสามารถวัดผลได้
+
+ซอฟต์แวร์ที่ดีต้องมีคุณสมบัติดังนี้:
+- Correctness: ทำงานได้ถูกต้องตามความต้องการ
+- Reliability: ทำงานได้อย่างสม่ำเสมอและเชื่อถือได้
+- Efficiency: ใช้ทรัพยากรระบบอย่างเหมาะสม
+- Maintainability: แก้ไขและปรับปรุงได้ง่าย
+- Usability: ใช้งานง่ายและเป็นมิตรกับผู้ใช้
+- Portability: ทำงานได้บนหลายแพลตฟอร์ม
+- Security: ปลอดภัยจากการโจมตีและการเข้าถึงโดยไม่ได้รับอนุญาต
+
+ความแตกต่างระหว่างซอฟต์แวร์และโปรแกรม:
+- โปรแกรม (Program) คือชุดคำสั่งที่เขียนขึ้นเพื่อแก้ปัญหาเฉพาะอย่าง
+- ซอฟต์แวร์ (Software) คือโปรแกรมพร้อมกับเอกสารประกอบ (Documentation) และข้อมูลที่เกี่ยวข้องทั้งหมด
+
+
+บทที่ 2: วงจรชีวิตการพัฒนาซอฟต์แวร์ (Software Development Life Cycle - SDLC)
+------------------------------------------------------------------------------
+
+SDLC คือกระบวนการที่กำหนดขั้นตอนในการพัฒนาซอฟต์แวร์ตั้งแต่เริ่มต้นจนถึงการใช้งานจริงและการบำรุงรักษา
+
+ขั้นตอนหลักของ SDLC:
+
+1. การวางแผน (Planning)
+   - กำหนดขอบเขตของโครงการ (Project Scope)
+   - ประเมินความเป็นไปได้ (Feasibility Study) ทั้งด้านเทคนิค การเงิน และการปฏิบัติงาน
+   - กำหนดเวลา (Schedule) และงบประมาณ (Budget)
+   - ระบุความเสี่ยง (Risk Identification)
+
+2. การวิเคราะห์ความต้องการ (Requirements Analysis)
+   - รวบรวมความต้องการจากผู้มีส่วนได้ส่วนเสีย (Stakeholders)
+   - แบ่งออกเป็น Functional Requirements และ Non-Functional Requirements
+   - จัดทำเอกสาร Software Requirements Specification (SRS)
+
+3. การออกแบบ (Design)
+   - System Design: ออกแบบสถาปัตยกรรมระบบโดยรวม
+   - Detailed Design: ออกแบบรายละเอียดของแต่ละ Module
+   - Database Design: ออกแบบฐานข้อมูล
+   - UI/UX Design: ออกแบบส่วนติดต่อผู้ใช้
+
+4. การพัฒนา (Implementation/Coding)
+   - เขียนโค้ดตามการออกแบบที่กำหนด
+   - ปฏิบัติตาม Coding Standards
+   - ทำ Code Review
+
+5. การทดสอบ (Testing)
+   - Unit Testing: ทดสอบแต่ละหน่วยของโค้ด
+   - Integration Testing: ทดสอบการทำงานร่วมกัน
+   - System Testing: ทดสอบระบบทั้งหมด
+   - User Acceptance Testing (UAT): ผู้ใช้จริงทดสอบระบบ
+
+6. การติดตั้ง (Deployment)
+   - นำซอฟต์แวร์ขึ้นสภาพแวดล้อมจริง (Production)
+   - ฝึกอบรมผู้ใช้งาน
+   - จัดทำคู่มือการใช้งาน
+
+7. การบำรุงรักษา (Maintenance)
+   - Corrective Maintenance: แก้ไข Bug
+   - Adaptive Maintenance: ปรับให้รองรับสภาพแวดล้อมใหม่
+   - Perfective Maintenance: เพิ่มประสิทธิภาพ
+   - Preventive Maintenance: ป้องกันปัญหาในอนาคต
+
+
+บทที่ 3: โมเดลการพัฒนาซอฟต์แวร์ (Software Development Models)
+---------------------------------------------------------------
+
+3.1 Waterfall Model
+-------------------
+Waterfall Model เป็นโมเดลแบบเส้นตรงที่แต่ละเฟสต้องเสร็จสิ้นก่อนจึงจะเริ่มเฟสถัดไปได้
+
+ลักษณะสำคัญ:
+- ขั้นตอนชัดเจนและเป็นลำดับ
+- มีเอกสารประกอบครบถ้วน
+- เหมาะกับโครงการที่ความต้องการชัดเจนและไม่เปลี่ยนแปลง
+
+ข้อดี:
+- ง่ายต่อการบริหารจัดการ
+- มีเอกสารครบถ้วน
+- เหมาะกับโครงการขนาดเล็กถึงกลางที่ความต้องการนิ่ง
+
+ข้อเสีย:
+- ยืดหยุ่นน้อย ยากต่อการเปลี่ยนแปลงความต้องการ
+- พบข้อผิดพลาดได้ช้า (ต้องรอถึงเฟส Testing)
+- ไม่เหมาะกับโครงการที่ความต้องการไม่ชัดเจน
+
+3.2 Agile Model
+---------------
+Agile เป็นแนวทางการพัฒนาซอฟต์แวร์แบบ Iterative และ Incremental โดยเน้นความยืดหยุ่นและการตอบสนองต่อการเปลี่ยนแปลง
+
+Agile Manifesto (4 ค่านิยมหลัก):
+1. Individuals and interactions > Processes and tools
+2. Working software > Comprehensive documentation
+3. Customer collaboration > Contract negotiation
+4. Responding to change > Following a plan
+
+12 หลักการของ Agile:
+- ส่งมอบซอฟต์แวร์ที่ใช้งานได้บ่อยและเร็ว
+- ยินดีรับการเปลี่ยนแปลงความต้องการ แม้ในช่วงปลายของการพัฒนา
+- ลูกค้าและทีมพัฒนาต้องทำงานร่วมกันตลอดโครงการ
+- สร้างโครงการบนพื้นฐานของบุคลากรที่มีแรงจูงใจ
+- การสื่อสารแบบ Face-to-Face มีประสิทธิภาพสูงสุด
+- ซอฟต์แวร์ที่ใช้งานได้คือตัววัดความก้าวหน้าหลัก
+- รักษาจังหวะการพัฒนาให้สม่ำเสมอ (Sustainable Pace)
+- ให้ความสำคัญกับการออกแบบที่ดีและเทคนิคที่เป็นเลิศ
+- ความเรียบง่ายคือสิ่งสำคัญ
+- ทีมที่จัดการตนเองได้ (Self-Organizing Teams)
+- ทบทวนและปรับปรุงตัวเองสม่ำเสมอ
+
+3.3 Scrum Framework
+-------------------
+Scrum เป็น Framework หนึ่งใน Agile ที่นิยมใช้มากที่สุด
+
+บทบาทใน Scrum:
+- Product Owner: เป็นตัวแทนของลูกค้า กำหนด Product Backlog และลำดับความสำคัญ
+- Scrum Master: ดูแลกระบวนการ Scrum และแก้ไขอุปสรรค
+- Development Team: ทีมพัฒนา cross-functional ที่จัดการตัวเองได้
+
+Scrum Events:
+- Sprint: รอบการพัฒนา 1-4 สัปดาห์
+- Sprint Planning: วางแผนงานใน Sprint
+- Daily Scrum (Stand-up): ประชุมประจำวัน 15 นาที
+- Sprint Review: ทบทวนผลงานกับ Stakeholders
+- Sprint Retrospective: ทีมทบทวนกระบวนการทำงาน
+
+Scrum Artifacts:
+- Product Backlog: รายการความต้องการทั้งหมดของผลิตภัณฑ์
+- Sprint Backlog: รายการงานที่เลือกมาทำใน Sprint นั้น
+- Increment: ผลลัพธ์ที่ได้จาก Sprint (Working Software)
+
+3.4 Waterfall vs Agile เปรียบเทียบ
+------------------------------------
+| ด้าน              | Waterfall              | Agile                      |
+|-------------------|------------------------|----------------------------|
+| โครงสร้าง         | เชิงเส้น (Linear)      | วนซ้ำ (Iterative)          |
+| ความยืดหยุ่น      | ต่ำ                    | สูง                        |
+| การมีส่วนร่วม     | น้อย                   | มาก                        |
+| เอกสาร            | เน้นเอกสาร             | เน้น Working Software      |
+| ความเสี่ยง        | พบช้า                  | พบเร็ว                     |
+| เหมาะกับ          | โครงการที่ Req. นิ่ง   | โครงการที่ Req. เปลี่ยนบ่อย|
+| การส่งมอบ         | ส่งครั้งเดียวตอนท้าย   | ส่งทีละส่วนบ่อยๆ           |
+
+
+บทที่ 4: การวิเคราะห์และจัดการความต้องการ (Requirements Engineering)
+--------------------------------------------------------------------
+
+ความต้องการแบ่งออกเป็น 2 ประเภทหลัก:
+
+4.1 Functional Requirements (ความต้องการเชิงหน้าที่)
+- อธิบายสิ่งที่ระบบต้องทำ
+- ตัวอย่าง: "ระบบต้องสามารถให้ผู้ใช้ Login ด้วย Email และ Password ได้"
+- เขียนในรูปแบบ Use Case หรือ User Story
+
+4.2 Non-Functional Requirements (ความต้องการที่ไม่ใช่เชิงหน้าที่)
+- Performance: ระบบต้องตอบสนองภายใน 2 วินาที
+- Security: ข้อมูลต้องถูกเข้ารหัสด้วย AES-256
+- Scalability: รองรับผู้ใช้พร้อมกัน 10,000 คน
+- Availability: ระบบต้องพร้อมใช้งาน 99.9% ของเวลา
+
+User Story Format:
+"As a [role], I want to [action], so that [benefit]"
+ตัวอย่าง: "As a student, I want to submit my homework online, so that I can submit anytime without coming to class."
+
+INVEST Criteria สำหรับ User Story ที่ดี:
+- Independent: เป็นอิสระจาก Story อื่น
+- Negotiable: สามารถเจรจาต่อรองได้
+- Valuable: มีคุณค่าต่อผู้ใช้
+- Estimable: สามารถประเมินขนาดได้
+- Small: มีขนาดเล็กพอที่จะทำใน Sprint เดียว
+- Testable: สามารถทดสอบได้
+
+
+บทที่ 5: การออกแบบซอฟต์แวร์ (Software Design)
+----------------------------------------------
+
+5.1 หลักการออกแบบ SOLID
+- S - Single Responsibility Principle: Class ควรมีหน้าที่เดียว
+- O - Open/Closed Principle: เปิดสำหรับการขยาย ปิดสำหรับการแก้ไข
+- L - Liskov Substitution Principle: Subclass ต้องแทนที่ Superclass ได้
+- I - Interface Segregation Principle: Interface ควรมีขนาดเล็กและเฉพาะเจาะจง
+- D - Dependency Inversion Principle: ขึ้นอยู่กับ Abstraction ไม่ใช่ Concrete
+
+5.2 Design Patterns
+Design Patterns คือแนวทางแก้ปัญหาที่ผ่านการพิสูจน์แล้วสำหรับปัญหาที่พบบ่อยในการออกแบบซอฟต์แวร์
+
+แบ่งออกเป็น 3 กลุ่มหลัก (GoF - Gang of Four):
+
+A) Creational Patterns (รูปแบบการสร้างวัตถุ)
+- Singleton: รับประกันว่า Class มี Instance เดียวเท่านั้น
+  ตัวอย่าง: Database Connection Pool, Logger
+- Factory Method: กำหนด Interface สำหรับสร้างวัตถุ แต่ให้ Subclass เป็นผู้ตัดสินใจ
+- Abstract Factory: สร้างกลุ่มของวัตถุที่เกี่ยวข้องกัน
+- Builder: แยกการสร้างวัตถุที่ซับซ้อนออกเป็นขั้นตอน
+- Prototype: สร้างวัตถุใหม่โดย Clone จากวัตถุที่มีอยู่
+
+B) Structural Patterns (รูปแบบโครงสร้าง)
+- Adapter: แปลง Interface ของ Class ให้ตรงกับที่ต้องการ
+- Decorator: เพิ่มความสามารถให้วัตถุแบบ Dynamic
+- Facade: จัดทำ Interface ที่เรียบง่ายสำหรับ Subsystem ที่ซับซ้อน
+- Proxy: ตัวแทนของวัตถุอื่น ควบคุมการเข้าถึง
+
+C) Behavioral Patterns (รูปแบบพฤติกรรม)
+- Observer: แจ้งเตือน Object ที่สนใจเมื่อ State เปลี่ยน
+  ตัวอย่าง: Event Listener, Notification System
+- Strategy: กำหนด Algorithm ใน Family และสลับกันใช้ได้
+- Command: แปลง Request เป็น Object
+- Template Method: กำหนดโครงร่าง Algorithm ใน Superclass
+
+5.3 Software Architecture Patterns
+- MVC (Model-View-Controller): แยก Logic, UI, และ Data
+- Microservices: แบ่งระบบเป็น Service ขนาดเล็กที่ทำงานอิสระ
+- Layered Architecture: แบ่งระบบเป็นชั้น (Presentation, Business, Data)
+- Event-Driven Architecture: การสื่อสารผ่าน Events
+
+
+บทที่ 6: การทดสอบซอฟต์แวร์ (Software Testing)
+----------------------------------------------
+
+6.1 ระดับของการทดสอบ
+
+Unit Testing:
+- ทดสอบหน่วยเล็กที่สุดของโค้ด (Function/Method)
+- เขียนโดย Developer
+- เครื่องมือ: JUnit (Java), pytest (Python), Jest (JavaScript)
+- ควรทำ Test-Driven Development (TDD)
+
+Integration Testing:
+- ทดสอบการทำงานร่วมกันระหว่าง Module
+- ตรวจสอบ Interface และการส่งข้อมูลระหว่าง Component
+- วิธี: Top-Down, Bottom-Up, Big Bang
+
+System Testing:
+- ทดสอบระบบทั้งหมดในสภาพแวดล้อมที่ใกล้เคียง Production
+- ตรวจสอบทั้ง Functional และ Non-Functional Requirements
+
+User Acceptance Testing (UAT):
+- ผู้ใช้จริงทดสอบระบบ
+- ยืนยันว่าระบบตรงตามความต้องการทางธุรกิจ
+
+6.2 ประเภทของการทดสอบ
+- Black Box Testing: ทดสอบโดยไม่รู้โครงสร้างภายใน
+- White Box Testing: ทดสอบโดยรู้โครงสร้างภายใน (เขียนเพื่อครอบคลุม Code Path)
+- Grey Box Testing: ผสมระหว่าง Black และ White Box
+- Regression Testing: ทดสอบซ้ำหลังแก้ไขโค้ดเพื่อให้แน่ใจว่าไม่มีอะไรพัง
+- Performance Testing: ทดสอบประสิทธิภาพภายใต้ภาระงานต่างๆ
+- Security Testing: ทดสอบความปลอดภัยของระบบ
+
+6.3 Test-Driven Development (TDD)
+วงจรของ TDD: Red → Green → Refactor
+1. Red: เขียน Test ที่ Fail ก่อน
+2. Green: เขียนโค้ดให้ Test ผ่าน
+3. Refactor: ปรับปรุงโค้ดโดยที่ Test ยังผ่าน
+
+ประโยชน์ของ TDD:
+- โค้ดมีคุณภาพสูงขึ้น
+- ลดการเกิด Bug
+- เป็น Living Documentation
+- ออกแบบได้ดีขึ้น (เพราะต้องคิดก่อนเขียน)
+
+
+บทที่ 7: การจัดการโครงการซอฟต์แวร์ (Software Project Management)
+-----------------------------------------------------------------
+
+7.1 การประเมินขนาดและความพยายาม
+- Lines of Code (LOC): วัดขนาดด้วยจำนวนบรรทัดโค้ด
+- Function Point: วัดขนาดด้วยฟังก์ชันการทำงาน
+- Story Point: ใช้ใน Agile เพื่อประเมินความซับซ้อนสัมพัทธ์
+- Planning Poker: เทคนิคประเมินร่วมกันในทีม Agile
+
+7.2 การบริหารความเสี่ยง (Risk Management)
+ขั้นตอน:
+1. Risk Identification: ระบุความเสี่ยงที่อาจเกิดขึ้น
+2. Risk Analysis: วิเคราะห์โอกาสและผลกระทบ
+3. Risk Prioritization: จัดลำดับความสำคัญ
+4. Risk Mitigation: วางแผนรับมือ
+5. Risk Monitoring: ติดตามอย่างต่อเนื่อง
+
+ประเภทความเสี่ยงในโครงการซอฟต์แวร์:
+- Technical Risk: เทคโนโลยีใหม่, ความซับซ้อนของระบบ
+- Project Risk: งบประมาณ, กำหนดเวลา, ทรัพยากร
+- Business Risk: การเปลี่ยนแปลงตลาด, การแข่งขัน
+- People Risk: การลาออกของบุคลากรสำคัญ
+
+7.3 เครื่องมือบริหารโครงการ
+- Gantt Chart: แสดงกำหนดการและ Dependencies
+- Kanban Board: แสดงสถานะงาน (To Do, In Progress, Done)
+- Burndown Chart: แสดงงานที่เหลือใน Sprint
+- Velocity: ความเร็วเฉลี่ยของทีมในการทำงาน
+
+
+บทที่ 8: Version Control และ DevOps
+------------------------------------
+
+8.1 Version Control System (VCS)
+- Git: ระบบ VCS แบบ Distributed ที่ได้รับความนิยมสูงสุด
+- Branching Strategy:
+  - Feature Branch: สร้าง Branch แยกสำหรับแต่ละ Feature
+  - Git Flow: มี Branch หลัก (main, develop, feature, release, hotfix)
+  - Trunk-Based Development: ทุกคน Commit ลง Main Branch บ่อยๆ
+
+8.2 Continuous Integration/Continuous Delivery (CI/CD)
+- CI (Continuous Integration): รวมโค้ดบ่อยๆ และ Build/Test อัตโนมัติ
+- CD (Continuous Delivery): Deploy อัตโนมัติไปยัง Staging Environment
+- CD (Continuous Deployment): Deploy อัตโนมัติไปยัง Production
+
+ประโยชน์ของ CI/CD:
+- ค้นพบ Bug เร็วขึ้น
+- ลดความเสี่ยงในการ Deploy
+- ส่งมอบ Feature ให้ลูกค้าได้เร็วขึ้น
+- เพิ่มความมั่นใจในการ Release
+
+8.3 Code Quality Metrics
+- Code Coverage: เปอร์เซ็นต์โค้ดที่ถูกทดสอบ (ควร > 80%)
+- Cyclomatic Complexity: ความซับซ้อนของโค้ด
+- Code Duplication: โค้ดที่ซ้ำกัน (ควรต่ำ)
+- Technical Debt: งานที่ต้องกลับมาแก้ในอนาคต
+
+
+บทที่ 9: UML (Unified Modeling Language)
+-----------------------------------------
+
+UML คือภาษากราฟิกมาตรฐานสำหรับแสดงโครงสร้างและพฤติกรรมของระบบซอฟต์แวร์
+
+9.1 Structure Diagrams
+- Class Diagram: แสดงโครงสร้าง Class และความสัมพันธ์
+  ความสัมพันธ์: Association, Aggregation, Composition, Inheritance, Realization
+- Component Diagram: แสดงส่วนประกอบของระบบ
+- Deployment Diagram: แสดงการติดตั้งระบบบน Hardware
+
+9.2 Behavior Diagrams
+- Use Case Diagram: แสดง Actor และ Use Case ของระบบ
+- Sequence Diagram: แสดงการโต้ตอบระหว่าง Object ตามลำดับเวลา
+- Activity Diagram: แสดงขั้นตอนการทำงาน (คล้าย Flowchart)
+- State Machine Diagram: แสดง State และการเปลี่ยน State ของ Object
+
+ความสัมพันธ์ใน Class Diagram:
+- Association: ความสัมพันธ์ทั่วไประหว่าง Class (เส้นธรรมดา)
+- Aggregation: "Has-a" แบบอ่อน วัตถุส่วนประกอบอยู่ได้โดยไม่มีหลัก (เพชรว่าง)
+- Composition: "Has-a" แบบแน่น วัตถุส่วนประกอบอยู่ไม่ได้โดยไม่มีหลัก (เพชรทึบ)
+- Inheritance: "Is-a" ความสัมพันธ์แบบสืบทอด (ลูกศรสามเหลี่ยมว่าง)
+- Realization: Class implement Interface (ลูกศรปะสามเหลี่ยมว่าง)
+
+
+บทที่ 10: Software Quality Assurance (SQA)
+------------------------------------------
+
+SQA คือกระบวนการตรวจสอบและรับรองคุณภาพซอฟต์แวร์ตลอดทั้ง SDLC
+
+10.1 Quality Attributes (ISO 25010)
+- Functional Suitability: ทำหน้าที่ได้ตรงตามที่ต้องการ
+- Performance Efficiency: ประสิทธิภาพในการใช้ทรัพยากร
+- Compatibility: ทำงานร่วมกับระบบอื่นได้
+- Usability: ใช้งานง่าย
+- Reliability: เชื่อถือได้
+- Security: ปลอดภัย
+- Maintainability: บำรุงรักษาง่าย
+- Portability: โยกย้ายได้
+
+10.2 Code Review
+- Peer Review: เพื่อนร่วมทีมตรวจสอบโค้ด
+- Pair Programming: เขียนโค้ดร่วมกัน 2 คน
+- Static Analysis: เครื่องมือวิเคราะห์โค้ดอัตโนมัติ (SonarQube, ESLint)
+
+10.3 หลักการ DRY, KISS, YAGNI
+- DRY (Don't Repeat Yourself): ไม่ควรมีโค้ดซ้ำกัน
+- KISS (Keep It Simple, Stupid): ออกแบบให้เรียบง่ายที่สุด
+- YAGNI (You Aren't Gonna Need It): ไม่เพิ่มฟีเจอร์ที่ยังไม่ต้องการ
+
+
+สรุปแนวคิดสำคัญของวิชาวิศวกรรมซอฟต์แวร์
+==========================================
+1. SDLC ให้กรอบในการพัฒนาซอฟต์แวร์อย่างเป็นระบบ
+2. Waterfall เหมาะกับโครงการที่ความต้องการนิ่ง ส่วน Agile เหมาะกับความต้องการที่เปลี่ยนแปลงบ่อย
+3. Requirements Engineering เป็นจุดเริ่มต้นที่สำคัญที่สุด ข้อผิดพลาดในขั้นนี้มีต้นทุนสูงที่สุด
+4. SOLID Principles และ Design Patterns ช่วยให้โค้ดมีคุณภาพและบำรุงรักษาได้ง่าย
+5. Testing เป็นกระบวนการต่อเนื่อง ไม่ใช่แค่ทำตอนท้าย
+6. CI/CD และ Version Control เป็นเครื่องมือสำคัญในการพัฒนาซอฟต์แวร์สมัยใหม่
+7. SQA ต้องทำตลอดทั้ง SDLC ไม่ใช่แค่เฉพาะเฟส Testing

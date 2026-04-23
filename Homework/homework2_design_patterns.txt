@@ -1,0 +1,235 @@
+งานที่ 2: Design Patterns และ Creational Patterns
+นักศึกษา: นางสาวมินตรา สุขสวัสดิ์  รหัส: 65XXXXXX02
+วิชา: แนวคิดวิศวกรรมซอฟต์แวร์  อาจารย์: ดร.วิภา รักษาดี
+===================================================
+
+คำถาม: จงอธิบายความหมายของ Design Patterns และประเภทของ Creational Patterns
+โดยเน้นอธิบาย Singleton Pattern อย่างละเอียด พร้อมยกตัวอย่างการใช้งานจริง
+และอธิบายข้อดีข้อเสียของ Pattern นี้
+
+---------------------------------------------------
+คำตอบ
+---------------------------------------------------
+
+1. Design Patterns คืออะไร
+--------------------------
+Design Patterns คือแนวทางหรือวิธีแก้ปัญหาที่ผ่านการพิสูจน์มาแล้วว่าใช้ได้ดี
+สำหรับปัญหาที่พบบ่อยในการออกแบบซอฟต์แวร์ เปรียบเหมือนสูตรสำเร็จที่นักพัฒนา
+สามารถนำมาปรับใช้กับปัญหาของตัวเองได้ โดยไม่ต้องคิดใหม่ทุกครั้ง
+
+Design Patterns ถูกรวบรวมและตีพิมพ์ครั้งแรกในหนังสือ "Design Patterns:
+Elements of Reusable Object-Oriented Software" โดยกลุ่มนักเขียน 4 คน
+ที่รู้จักในชื่อ Gang of Four (GoF) ได้แก่ Erich Gamma, Richard Helm,
+Ralph Johnson และ John Vlissides
+
+Design Patterns ไม่ใช่โค้ดสำเร็จรูปที่ Copy-Paste ได้เลย แต่เป็นแนวคิด
+ในการแก้ปัญหาที่ต้องนำไปปรับใช้ให้เหมาะสมกับแต่ละสถานการณ์
+
+ประโยชน์ของ Design Patterns:
+- ช่วยให้นักพัฒนาสื่อสารกันได้ง่ายขึ้น เช่น พูดว่า "ใช้ Singleton" แทนการอธิบายยาวๆ
+- ลดเวลาในการออกแบบ เพราะมีแนวทางที่ผ่านการทดสอบมาแล้ว
+- ทำให้โค้ดมีโครงสร้างที่ดี บำรุงรักษาง่าย และขยายได้ในอนาคต
+- ช่วยหลีกเลี่ยงปัญหาที่คนอื่นเคยเจอมาแล้ว
+
+
+2. ประเภทของ Design Patterns (GoF)
+------------------------------------
+Design Patterns แบ่งออกเป็น 3 ประเภทหลัก
+
+ประเภทที่ 1 Creational Patterns (รูปแบบการสร้างวัตถุ)
+เกี่ยวกับการสร้าง Object โดยซ่อนรายละเอียดการสร้างไว้ภายใน
+มี 5 Pattern ได้แก่ Singleton, Factory Method, Abstract Factory, Builder, Prototype
+
+ประเภทที่ 2 Structural Patterns (รูปแบบโครงสร้าง)
+เกี่ยวกับการจัดโครงสร้างของ Class และ Object ให้ทำงานร่วมกันได้ดี
+มี Pattern เช่น Adapter, Decorator, Facade, Proxy, Bridge, Composite, Flyweight
+
+ประเภทที่ 3 Behavioral Patterns (รูปแบบพฤติกรรม)
+เกี่ยวกับการสื่อสารและการแบ่งหน้าที่ระหว่าง Object
+มี Pattern เช่น Observer, Strategy, Command, Template Method, Iterator, State
+
+
+3. Creational Patterns ทั้ง 5 แบบ
+-----------------------------------
+
+3.1 Singleton Pattern
+รับประกันว่า Class มี Instance เพียงหนึ่งเดียวตลอดการทำงานของโปรแกรม
+และมี Global Access Point เพื่อเข้าถึง Instance นั้น
+(จะอธิบายละเอียดในหัวข้อถัดไป)
+
+3.2 Factory Method Pattern
+กำหนด Interface สำหรับการสร้าง Object แต่ให้ Subclass เป็นผู้ตัดสินใจว่าจะสร้าง Object ประเภทใด
+ทำให้ Superclass ไม่ต้องรู้ว่าจะสร้าง Object ชนิดอะไร
+
+ตัวอย่าง: ระบบการแจ้งเตือน (Notification) ที่มี Creator เป็น NotificationFactory
+แต่ Subclass อย่าง EmailNotificationFactory หรือ SMSNotificationFactory
+เป็นผู้สร้าง Notification Object จริงๆ
+
+3.3 Abstract Factory Pattern
+สร้างกลุ่มของ Object ที่เกี่ยวข้องกัน (Product Family) โดยไม่ระบุ Class ที่แน่นอน
+เหมาะเมื่อต้องการสร้างหลาย Object ที่ต้องทำงานร่วมกัน
+
+ตัวอย่าง: UI Framework ที่ต้องสร้าง Button, Checkbox, TextField
+แบบ Windows Style หรือ Mac Style ทั้งชุดพร้อมกัน
+
+3.4 Builder Pattern
+แยกกระบวนการสร้าง Object ที่ซับซ้อนออกเป็นขั้นตอนย่อยๆ
+ทำให้สามารถสร้าง Object แบบต่างๆ ด้วยกระบวนการสร้างเดียวกัน
+
+ตัวอย่าง: การสร้าง SQL Query Builder ที่ให้เรียก .select().from().where().orderBy()
+ต่อกันเป็น Method Chaining ก่อนจะ .build() เป็น Query จริง
+
+3.5 Prototype Pattern
+สร้าง Object ใหม่โดยการ Clone จาก Object ที่มีอยู่แล้ว
+เหมาะเมื่อการสร้าง Object ใหม่จาก Scratch มีต้นทุนสูง
+
+ตัวอย่าง: ในเกม การ Clone ศัตรูตัวที่มีการตั้งค่าครบแล้ว
+แทนที่จะสร้างใหม่ทุกครั้งและ Set ค่าทุก Property
+
+
+4. Singleton Pattern อย่างละเอียด
+-----------------------------------
+
+4.1 ปัญหาที่ Singleton แก้ไข
+ในบางกรณีเราต้องการให้มี Object เพียงตัวเดียวในระบบ เช่น
+- Database Connection Pool ที่ควรมีแค่ตัวเดียวเพื่อควบคุม Connection ทั้งหมด
+- Logger ที่ทุกส่วนของโปรแกรมใช้ร่วมกัน
+- Configuration Manager ที่เก็บการตั้งค่าระบบ
+- Cache Manager
+
+ถ้าไม่ใช้ Singleton และสร้าง Object เหล่านี้หลายตัว อาจเกิดปัญหา:
+- ใช้ทรัพยากรเกินความจำเป็น
+- ข้อมูลไม่สอดคล้องกัน เพราะแต่ละ Instance มี State แยกกัน
+- Database Connection เปิดมากเกินไปจนระบบล่ม
+
+4.2 วิธีการทำงานของ Singleton
+Singleton มีหลักการทำงาน 3 ข้อ:
+1. ทำให้ Constructor เป็น Private เพื่อป้องกันการสร้าง Instance จากภายนอก
+2. เก็บ Instance เดียวไว้ใน Static Variable ของ Class
+3. จัดทำ Static Method (getInstance) เพื่อเป็นช่องทางเดียวในการเข้าถึง Instance
+
+ตัวอย่างโค้ด Python:
+class DatabaseConnection:
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance.connection = cls._instance._connect()
+        return cls._instance
+
+    def _connect(self):
+        # สร้าง Connection จริงๆ
+        return "Connected to Database"
+
+    def query(self, sql):
+        return f"Executing: {sql}"
+
+# การใช้งาน
+db1 = DatabaseConnection()
+db2 = DatabaseConnection()
+print(db1 is db2)  # True เพราะเป็น Instance เดียวกัน
+
+ตัวอย่างโค้ด Java:
+public class Logger {
+    private static Logger instance;
+    private List<String> logs = new ArrayList<>();
+
+    private Logger() {}  // Private Constructor
+
+    public static Logger getInstance() {
+        if (instance == null) {
+            instance = new Logger();
+        }
+        return instance;
+    }
+
+    public void log(String message) {
+        logs.add(message);
+        System.out.println("[LOG] " + message);
+    }
+}
+
+// การใช้งาน
+Logger log1 = Logger.getInstance();
+Logger log2 = Logger.getInstance();
+// log1 == log2 เสมอ
+
+4.3 ปัญหา Thread Safety ใน Singleton
+ในสภาพแวดล้อมที่มีหลาย Thread ทำงานพร้อมกัน (Multithreading)
+อาจเกิดปัญหาที่ Thread หลายตัวตรวจสอบว่า instance == null พร้อมกัน
+แล้วสร้าง Instance ซ้ำกัน ซึ่งทำลายหลักการ Singleton
+
+วิธีแก้ไขใน Java คือการใช้ synchronized หรือ Double-Checked Locking:
+public static synchronized Logger getInstance() {
+    if (instance == null) {
+        instance = new Logger();
+    }
+    return instance;
+}
+
+หรือใช้วิธี Eager Initialization ที่ปลอดภัยกว่า:
+private static final Logger instance = new Logger();
+
+ใน Python เนื่องจากมี GIL (Global Interpreter Lock) ปัญหานี้จึงน้อยกว่า
+แต่ถ้าใช้ Multiprocessing ก็ต้องระวังเช่นกัน
+
+
+5. ข้อดีและข้อเสียของ Singleton Pattern
+-----------------------------------------
+
+ข้อดี:
+1. รับประกันว่ามีเพียง Instance เดียวในระบบ ป้องกันความขัดแย้งของข้อมูล
+2. ประหยัดทรัพยากร ไม่สร้าง Object ซ้ำโดยไม่จำเป็น
+3. มี Global Access Point ที่สะดวกต่อการใช้งานจากทุกส่วนของโปรแกรม
+4. Instance จะถูกสร้างก็ต่อเมื่อมีการเรียกใช้ครั้งแรก (Lazy Initialization)
+
+ข้อเสีย:
+1. ละเมิด Single Responsibility Principle เพราะ Class ต้องจัดการทั้ง Business Logic
+   และการควบคุม Instance ของตัวเอง
+2. ทดสอบยาก (Hard to Test) เพราะเป็น Global State ทำให้ Unit Test แต่ละ Test Case
+   อาจส่งผลกระทบต่อกัน
+3. ใน Multithreading Environment ต้องระวังเรื่อง Race Condition
+4. บางคนมองว่า Singleton เป็น Anti-Pattern เพราะทำให้โค้ดมี Coupling สูง
+   และยากต่อการ Refactor
+
+ทางเลือกแทน Singleton:
+หลายโปรเจกต์สมัยใหม่ใช้ Dependency Injection (DI) แทน Singleton
+โดยส่ง Object ที่ต้องการใช้ร่วมกันเข้าไปผ่าน Constructor
+แทนที่จะให้แต่ละ Class ไปเรียก getInstance() เอง
+ทำให้โค้ด Testable มากขึ้นและ Coupling ลดลง
+
+
+6. ตัวอย่างการใช้งาน Singleton ในชีวิตจริง
+--------------------------------------------
+
+ตัวอย่างที่ 1 Configuration Manager
+ระบบขนาดใหญ่มักมี Configuration File เช่น database URL, API keys
+ถ้าอ่าน File ทุกครั้งที่ต้องการค่า Config จะช้ามาก
+จึงใช้ Singleton อ่านครั้งเดียวตอน Start และแคชไว้ใน Memory
+
+ตัวอย่างที่ 2 Connection Pool
+การเปิด Database Connection ใหม่ทุกครั้งที่ต้องการ Query ใช้เวลานาน
+Connection Pool ที่เป็น Singleton จะเปิด Connection ไว้ล่วงหน้าและ
+ให้ Client ยืมไปใช้แล้วคืนมา ทำให้ประสิทธิภาพดีขึ้นมาก
+
+ตัวอย่างที่ 3 Logging System
+ในระบบที่มีหลาย Module ถ้าแต่ละ Module มี Logger ของตัวเอง
+Log File จะกระจัดกระจาย ยากต่อการ Debug
+Logger Singleton ทำให้ทุก Module เขียน Log ไปยังที่เดียวกัน
+และสามารถกำหนด Format และ Level ของ Log ได้จากจุดเดียว
+
+
+7. สรุป
+--------
+Design Patterns เป็นเครื่องมือสำคัญของนักพัฒนาซอฟต์แวร์มืออาชีพ
+ช่วยให้แก้ปัญหาที่พบบ่อยได้อย่างมีประสิทธิภาพ
+
+Creational Patterns ทั้ง 5 แบบช่วยจัดการการสร้าง Object อย่างยืดหยุ่น
+โดย Singleton เหมาะสำหรับสถานการณ์ที่ต้องการ Instance เดียวในระบบ
+แต่ควรใช้อย่างระมัดระวัง เพราะอาจทำให้โค้ดทดสอบยากและมี Coupling สูง
+
+ในการเลือก Pattern ควรพิจารณาให้เหมาะสมกับบริบทของปัญหา
+ไม่ควรใช้ Pattern เพียงเพราะมันดูดีหรือซับซ้อน
+เพราะ Pattern ที่ไม่เหมาะสมอาจทำให้โค้ดซับซ้อนกว่าเดิมโดยไม่จำเป็น
+ตามหลัก KISS (Keep It Simple, Stupid) และ YAGNI (You Aren't Gonna Need It)
