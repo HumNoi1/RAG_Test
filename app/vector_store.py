@@ -102,9 +102,16 @@ def ensure_collection(collection_name: str) -> None:
                 collection_name=collection_name,
                 vectors_config=VectorParams(size=dim, distance=Distance.COSINE),
             )
-        except (ResponseHandlingException, UnexpectedResponse) as exc:
+            logger.info(f"Created collection '{collection_name}' with dim={dim}")
+        except UnexpectedResponse as exc:
+            if exc.status_code == 409:
+                # Race condition: another request created it concurrently
+                logger.info(f"Collection '{collection_name}' already created concurrently")
+                _validate_collection_dimension(collection_name, dim)
+            else:
+                _raise_qdrant_error(exc)
+        except ResponseHandlingException as exc:
             _raise_qdrant_error(exc)
-        logger.info(f"Created collection '{collection_name}' with dim={dim}")
     else:
         _validate_collection_dimension(collection_name, dim)
         logger.info(f"Collection '{collection_name}' already exists")
@@ -281,9 +288,16 @@ async def ensure_collection_async(collection_name: str) -> None:
                 collection_name=collection_name,
                 vectors_config=VectorParams(size=dim, distance=Distance.COSINE),
             )
-        except (ResponseHandlingException, UnexpectedResponse) as exc:
+            logger.info(f"Created collection '{collection_name}' with dim={dim}")
+        except UnexpectedResponse as exc:
+            if exc.status_code == 409:
+                # Race condition: another request created it concurrently
+                logger.info(f"Collection '{collection_name}' already created concurrently")
+                await _validate_collection_dimension_async(collection_name, dim)
+            else:
+                _raise_qdrant_error(exc)
+        except ResponseHandlingException as exc:
             _raise_qdrant_error(exc)
-        logger.info(f"Created collection '{collection_name}' with dim={dim}")
     else:
         await _validate_collection_dimension_async(collection_name, dim)
         logger.info(f"Collection '{collection_name}' already exists")

@@ -13,8 +13,8 @@ class Settings(BaseSettings):
     llm_model: str = "qwen/qwen3-32b"
     groq_api_key: str = ""
 
-    chunk_size: int = 500
-    chunk_overlap: int = 50
+    chunk_size: int = 1200
+    chunk_overlap: int = 150
     top_k: int = 5
 
     max_upload_mb: int = 20

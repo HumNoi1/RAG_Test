@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 import re
+from functools import lru_cache
 
 from app.config import get_settings
 from app.embeddings import embed_query, embed_texts
@@ -26,6 +27,17 @@ logger = logging.getLogger(__name__)
 
 class MissingLLMApiKeyError(RuntimeError):
     """Raised when the configured LLM provider has no API key."""
+
+
+@lru_cache
+def _get_groq_client():
+    """Module-level singleton — reuses connection pool across requests."""
+    from groq import AsyncGroq
+
+    settings = get_settings()
+    if not settings.groq_api_key:
+        raise MissingLLMApiKeyError("GROQ_API_KEY not set")
+    return AsyncGroq(api_key=settings.groq_api_key)
 
 
 def chunk_text(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
@@ -132,13 +144,8 @@ async def rag_with_llm(
     """
     Async: ส่ง retrieved chunks + query ไปให้ Groq แล้ว return (answer, model_name)
     """
-    from groq import AsyncGroq
-
     settings = get_settings()
-    if not settings.groq_api_key:
-        raise MissingLLMApiKeyError("GROQ_API_KEY not set")
-
-    client = AsyncGroq(api_key=settings.groq_api_key)
+    client = _get_groq_client()
     context = build_context(chunks)
     context = truncate_context(context, settings.max_context_chars)
 
@@ -170,13 +177,8 @@ async def rag_with_llm_stream(
     chunks: list[RetrievedChunk],
 ):
     """Async streaming: yield chunks from Groq response."""
-    from groq import AsyncGroq
-
     settings = get_settings()
-    if not settings.groq_api_key:
-        raise MissingLLMApiKeyError("GROQ_API_KEY not set")
-
-    client = AsyncGroq(api_key=settings.groq_api_key)
+    client = _get_groq_client()
     context = build_context(chunks)
     context = truncate_context(context, settings.max_context_chars)
 
@@ -350,13 +352,8 @@ async def grade_with_llm(
     request: GradeRequest,
     chunks: list[RetrievedChunk],
 ) -> tuple[dict, str]:
-    from groq import AsyncGroq
-
     settings = get_settings()
-    if not settings.groq_api_key:
-        raise MissingLLMApiKeyError("GROQ_API_KEY not set")
-
-    client = AsyncGroq(api_key=settings.groq_api_key)
+    client = _get_groq_client()
     context = build_context(chunks)
     context = truncate_context(context, settings.max_context_chars)
     rubric_json = json.dumps(

@@ -75,10 +75,11 @@ async def root():
 
 @app.get("/health", tags=["Health"])
 async def health():
-    from app.vector_store import get_qdrant_client
+    from app.vector_store import get_async_qdrant_client
     try:
-        client = get_qdrant_client()
-        collections = [c.name for c in client.get_collections().collections]
+        client = get_async_qdrant_client()
+        response = await client.get_collections()
+        collections = [c.name for c in response.collections]
         return {
             "status": "healthy",
             "qdrant": "connected",
