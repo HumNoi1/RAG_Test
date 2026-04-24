@@ -1,6 +1,5 @@
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-
 MetadataValue = str | int | float | bool
 
 
@@ -9,6 +8,9 @@ class IngestRequest(BaseModel):
     collection_name: str | None = None
     source_name: str | None = Field(None, description="ชื่อไฟล์หรือแหล่งข้อมูล")
     metadata: dict[str, MetadataValue] = Field(default_factory=dict)
+    document_id: str | None = Field(
+        None, description="ID ของ document ใน Supabase สำหรับใช้ลบ chunks ทีหลัง"
+    )
 
 
 class IngestResponse(BaseModel):
@@ -16,6 +18,7 @@ class IngestResponse(BaseModel):
     chunks_stored: int
     collection: str
     source: str
+    document_id: str = Field(..., description="UUID ที่ใช้ระบุ document ใน Qdrant payload")
     metadata: dict[str, MetadataValue] = Field(default_factory=dict)
 
 

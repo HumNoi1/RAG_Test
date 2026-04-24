@@ -1,3 +1,4 @@
+import hashlib
 import json
 import logging
 import re
@@ -12,7 +13,13 @@ from app.models import (
     RetrievedChunk,
     RubricCriterionScore,
 )
-from app.vector_store import search_similar, upsert_chunks
+from app.vector_store import (
+    CollectionDimensionMismatchError,
+    CollectionNotFoundError,
+    QdrantUnavailableError,
+    search_similar_async,
+    upsert_chunks_async,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -60,14 +67,14 @@ def chunk_text(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
     return [c for c in chunks if c]
 
 
-def ingest_text(
+async def ingest_text(
     text: str,
     source: str,
     collection_name: str | None = None,
     metadata: dict[str, MetadataValue] | None = None,
 ) -> tuple[int, str]:
     """
-    Pipeline: text → chunks → embeddings → Qdrant
+    Async pipeline: text → chunks → embeddings → Qdrant
     Returns (chunks_stored, collection_name)
     """
     settings = get_settings()
@@ -79,13 +86,20 @@ def ingest_text(
     if not chunks:
         return 0, collection
 
-    embeddings = embed_texts(chunks)
-    stored = upsert_chunks(collection, chunks, embeddings, source, metadata)
+    embeddings = await embed_texts(chunks)
+
+    text_hash = hashlib.md5(text.encode("utf-8")).hexdigest()
+    enriched_metadata = dict(metadata or {})
+    enriched_metadata["text_hash"] = text_hash
+
+    stored = await upsert_chunks_async(
+        collection, chunks, embeddings, source, enriched_metadata
+    )
 
     return stored, collection
 
 
-def retrieve(
+async def retrieve(
     query: str,
     collection_name: str | None = None,
     top_k: int | None = None,
@@ -93,14 +107,14 @@ def retrieve(
     metadata_filters: dict[str, MetadataValue] | None = None,
 ) -> list[RetrievedChunk]:
     """
-    Pipeline: query → embedding → Qdrant search → RetrievedChunk list
+    Async pipeline: query → embedding → Qdrant search → RetrievedChunk list
     """
     settings = get_settings()
     collection = collection_name or settings.qdrant_collection
     k = top_k or settings.top_k
 
-    query_vector = embed_query(query)
-    results = search_similar(
+    query_vector = await embed_query(query)
+    results = await search_similar_async(
         collection,
         query_vector,
         k,
@@ -109,6 +123,110 @@ def retrieve(
     )
 
     return [_build_retrieved_chunk(result.payload, result.score) for result in results]
+
+
+async def rag_with_llm(
+    query: str,
+    chunks: list[RetrievedChunk],
+) -> tuple[str, str]:
+    """
+    Async: ส่ง retrieved chunks + query ไปให้ Groq แล้ว return (answer, model_name)
+    """
+    from groq import AsyncGroq
+
+    settings = get_settings()
+    if not settings.groq_api_key:
+        raise MissingLLMApiKeyError("GROQ_API_KEY not set")
+
+    client = AsyncGroq(api_key=settings.groq_api_key)
+    context = build_context(chunks)
+    context = truncate_context(context, settings.max_context_chars)
+
+    system_prompt = (
+        "คุณเป็นผู้ช่วยที่ฉลาดและตอบคำถามโดยอิงจากข้อมูลที่ให้มาเท่านั้น "
+        "ตอบเป็นภาษาเดียวกับคำถาม หากข้อมูลไม่เพียงพอให้บอกว่าไม่มีข้อมูลเพียงพอ\n\n"
+        "You are a smart assistant that answers questions based ONLY on the provided context. "
+        "Reply in the same language as the question. If the context is insufficient, say so."
+    )
+
+    user_prompt = f"Context:\n{context}\n\nQuestion: {query}"
+
+    response = await client.chat.completions.create(
+        model=settings.llm_model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=settings.llm_temperature,
+    )
+
+    answer = response.choices[0].message.content
+    model_name = response.model or settings.llm_model
+    return answer, model_name
+
+
+async def rag_with_llm_stream(
+    query: str,
+    chunks: list[RetrievedChunk],
+):
+    """Async streaming: yield chunks from Groq response."""
+    from groq import AsyncGroq
+
+    settings = get_settings()
+    if not settings.groq_api_key:
+        raise MissingLLMApiKeyError("GROQ_API_KEY not set")
+
+    client = AsyncGroq(api_key=settings.groq_api_key)
+    context = build_context(chunks)
+    context = truncate_context(context, settings.max_context_chars)
+
+    system_prompt = (
+        "คุณเป็นผู้ช่วยที่ฉลาดและตอบคำถามโดยอิงจากข้อมูลที่ให้มาเท่านั้น "
+        "ตอบเป็นภาษาเดียวกับคำถาม หากข้อมูลไม่เพียงพอให้บอกว่าไม่มีข้อมูลเพียงพอ\n\n"
+        "You are a smart assistant that answers questions based ONLY on the provided context. "
+        "Reply in the same language as the question. If the context is insufficient, say so."
+    )
+
+    user_prompt = f"Context:\n{context}\n\nQuestion: {query}"
+
+    stream = await client.chat.completions.create(
+        model=settings.llm_model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=settings.llm_temperature,
+        stream=True,
+    )
+
+    model_name = ""
+    async for chunk in stream:
+        content = chunk.choices[0].delta.content or ""
+        model_name = chunk.model or settings.llm_model
+        if content:
+            yield content, model_name
+
+
+def build_context(chunks: list[RetrievedChunk]) -> str:
+    """รวม chunks เป็น context string สำหรับส่งให้ LLM"""
+    parts = []
+    for i, chunk in enumerate(chunks, 1):
+        metadata_text = ""
+        if chunk.metadata:
+            metadata_text = (
+                f", metadata: {json.dumps(chunk.metadata, ensure_ascii=False)}"
+            )
+        parts.append(
+            f"[{i}] (source: {chunk.source}, chunk_index: {chunk.chunk_index}, score: {chunk.score}{metadata_text})\n{chunk.text}"
+        )
+    return "\n\n---\n\n".join(parts)
+
+
+def truncate_context(context: str, max_chars: int) -> str:
+    """ตัด context ให้ไม่เกิน max_chars โดยตัดจากท้าย"""
+    if len(context) <= max_chars:
+        return context
+    return context[:max_chars].rsplit("\n\n---\n\n", 1)[0] + "\n\n---\n\n[... context truncated due to length ...]"
 
 
 def _build_retrieved_chunk(payload: dict, score: float) -> RetrievedChunk:
@@ -127,63 +245,26 @@ def _build_retrieved_chunk(payload: dict, score: float) -> RetrievedChunk:
     )
 
 
-def build_context(chunks: list[RetrievedChunk]) -> str:
-    """รวม chunks เป็น context string สำหรับส่งให้ LLM"""
+def _build_grading_query(request: GradeRequest) -> str:
     parts = []
-    for i, chunk in enumerate(chunks, 1):
-        metadata_text = ""
-        if chunk.metadata:
-            metadata_text = f", metadata: {json.dumps(chunk.metadata, ensure_ascii=False)}"
-        parts.append(
-            f"[{i}] (source: {chunk.source}, chunk_index: {chunk.chunk_index}, score: {chunk.score}{metadata_text})\n{chunk.text}"
-        )
-    return "\n\n---\n\n".join(parts)
-
-
-def rag_with_llm(
-    query: str,
-    chunks: list[RetrievedChunk],
-) -> tuple[str, str]:
-    """
-    ส่ง retrieved chunks + query ไปให้ Groq แล้ว return (answer, model_name)
-    """
-    from groq import Groq
-
-    settings = get_settings()
-    if not settings.groq_api_key:
-        raise MissingLLMApiKeyError("GROQ_API_KEY not set")
-
-    client = Groq(api_key=settings.groq_api_key)
-    context = build_context(chunks)
-
-    system_prompt = (
-        "คุณเป็นผู้ช่วยที่ฉลาดและตอบคำถามโดยอิงจากข้อมูลที่ให้มาเท่านั้น "
-        "ตอบเป็นภาษาเดียวกับคำถาม หากข้อมูลไม่เพียงพอให้บอกว่าไม่มีข้อมูลเพียงพอ\n\n"
-        "You are a smart assistant that answers questions based ONLY on the provided context. "
-        "Reply in the same language as the question. If the context is insufficient, say so."
+    if request.assignment_title:
+        parts.append(f"Assignment: {request.assignment_title}")
+    if request.assignment_instructions:
+        parts.append(f"Instructions: {request.assignment_instructions}")
+    rubric_summary = "; ".join(
+        f"{item.criterion_name} (max {item.max_score})" for item in request.rubric
     )
-
-    user_prompt = f"Context:\n{context}\n\nQuestion: {query}"
-
-    response = client.chat.completions.create(
-        model=settings.llm_model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        temperature=0.2,
-    )
-
-    answer = response.choices[0].message.content
-    model_name = response.model or settings.llm_model
-    return answer, model_name
+    if rubric_summary:
+        parts.append(f"Rubric: {rubric_summary}")
+    return "\n".join(parts) if parts else request.submission_text[:500]
 
 
-def grade_submission(
+async def grade_submission(
     request: GradeRequest,
 ) -> GradeResponse:
-    chunks = retrieve(
-        query=request.submission_text,
+    query_for_retrieval = _build_grading_query(request)
+    chunks = await retrieve(
+        query=query_for_retrieval,
         collection_name=request.collection_name,
         top_k=request.top_k,
         score_threshold=request.score_threshold,
@@ -211,7 +292,7 @@ def grade_submission(
             has_llm_response=False,
         )
 
-    score_payload, model_name = grade_with_llm(request, chunks)
+    score_payload, model_name = await grade_with_llm(request, chunks)
     max_score = round(sum(item.max_score for item in request.rubric), 4)
 
     rubric_breakdown = [
@@ -265,19 +346,22 @@ def grade_submission(
     )
 
 
-def grade_with_llm(
+async def grade_with_llm(
     request: GradeRequest,
     chunks: list[RetrievedChunk],
 ) -> tuple[dict, str]:
-    from groq import Groq
+    from groq import AsyncGroq
 
     settings = get_settings()
     if not settings.groq_api_key:
         raise MissingLLMApiKeyError("GROQ_API_KEY not set")
 
-    client = Groq(api_key=settings.groq_api_key)
+    client = AsyncGroq(api_key=settings.groq_api_key)
     context = build_context(chunks)
-    rubric_json = json.dumps([item.model_dump() for item in request.rubric], ensure_ascii=False)
+    context = truncate_context(context, settings.max_context_chars)
+    rubric_json = json.dumps(
+        [item.model_dump() for item in request.rubric], ensure_ascii=False
+    )
     max_score = round(sum(item.max_score for item in request.rubric), 4)
 
     system_prompt = (
@@ -299,13 +383,13 @@ def grade_with_llm(
         "chunk_index, quote, relevance_score, metadata."
     )
 
-    response = client.chat.completions.create(
+    response = await client.chat.completions.create(
         model=settings.llm_model,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        temperature=0.2,
+        temperature=settings.llm_temperature,
         response_format={"type": "json_object"},
     )
 
@@ -370,7 +454,9 @@ def _normalize_grade_payload(payload: dict, request: GradeRequest) -> dict:
                     if item.get("relevance_score") is not None
                     else None
                 ),
-                "metadata": item.get("metadata", {}) if isinstance(item.get("metadata"), dict) else {},
+                "metadata": item.get("metadata", {})
+                if isinstance(item.get("metadata"), dict)
+                else {},
             }
         )
 

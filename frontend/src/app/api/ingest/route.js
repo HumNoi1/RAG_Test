@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
-const RAG_API = process.env.NEXT_PUBLIC_RAG_API_URL ?? "http://localhost:8000";
+const RAG_API = process.env.RAG_API_URL ?? "http://localhost:8000";
 
 function computeMd5(buffer) {
   return crypto.createHash("md5").update(Buffer.from(buffer)).digest("hex");

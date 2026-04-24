@@ -1,4 +1,5 @@
 import json
+import uuid
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 
@@ -13,8 +14,13 @@ from app.vector_store import (
     delete_collection,
     get_collection_info,
 )
+from app.config import get_settings
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
+
+
+def _get_max_upload_bytes() -> int:
+    return get_settings().max_upload_mb * 1024 * 1024
 
 
 def _raise_storage_http_error(exc: Exception) -> None:
@@ -108,6 +114,13 @@ async def upload_and_ingest(
         )
 
     content = await file.read()
+
+    if len(content) > _get_max_upload_bytes():
+        raise HTTPException(
+            status_code=413,
+            detail=f"ขนาดไฟล์เกินขีดจำกัด {get_settings().max_upload_mb} MB",
+        )
+
     text, file_type = _extract_or_raise(content, file.filename)
 
     if not text.strip():
@@ -116,9 +129,14 @@ async def upload_and_ingest(
         )
 
     parsed_metadata = _parse_metadata(metadata)
+
+    # Extract or generate a stable document_id for Qdrant payload linkage
+    doc_id = str(parsed_metadata.pop("document_id", None) or uuid.uuid4())
+    parsed_metadata["document_id"] = doc_id
     parsed_metadata["file_type"] = file_type
+
     try:
-        stored, collection = ingest_text(
+        stored, collection = await ingest_text(
             text=text,
             source=file.filename,
             collection_name=collection_name,
@@ -132,6 +150,7 @@ async def upload_and_ingest(
         chunks_stored=stored,
         collection=collection,
         source=file.filename,
+        document_id=doc_id,
         metadata=parsed_metadata,
     )
 
@@ -143,19 +162,24 @@ async def upload_and_ingest(
 )
 async def ingest_raw_text(
     body: IngestRequest,
-    text: str = "",
     collection_name: str | None = None,
 ):
-    raw_text = body.text or text
+    raw_text = body.text
     if not raw_text.strip():
         raise HTTPException(status_code=400, detail="text ว่างเปล่า")
 
+    body_metadata = dict(body.metadata)
+    doc_id = body.document_id or str(
+        body_metadata.pop("document_id", None) or uuid.uuid4()
+    )
+    body_metadata["document_id"] = doc_id
+
     try:
-        stored, collection = ingest_text(
+        stored, collection = await ingest_text(
             text=raw_text,
             source=body.source_name or "raw_input",
             collection_name=collection_name or body.collection_name,
-            metadata=body.metadata,
+            metadata=body_metadata,
         )
     except (CollectionDimensionMismatchError, QdrantUnavailableError) as exc:
         _raise_storage_http_error(exc)
@@ -165,7 +189,8 @@ async def ingest_raw_text(
         chunks_stored=stored,
         collection=collection,
         source=body.source_name or "raw_input",
-        metadata=body.metadata,
+        document_id=doc_id,
+        metadata=body_metadata,
     )
 
 

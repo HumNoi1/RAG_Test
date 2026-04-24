@@ -20,6 +20,18 @@ const INGEST_STATUS_LABEL = {
 
 const STATUS_SORT_ORDER = { ready: 0, processing: 1, pending: 2, failed: 3 };
 
+const ASSIGN_STATUS_COLOR = {
+  draft: "bg-gray-100 text-gray-600",
+  published: "bg-green-100 text-green-700",
+  closed: "bg-red-100 text-red-700",
+};
+
+const ASSIGN_STATUS_LABEL = {
+  draft: "ร่าง",
+  published: "เผยแพร่แล้ว",
+  closed: "ปิดแล้ว",
+};
+
 export default function CoursePage() {
   const params = useParams();
   const courseId = params.courseId;
@@ -51,6 +63,10 @@ export default function CoursePage() {
   ]);
   const [assignLoading, setAssignLoading] = useState(false);
   const [assignError, setAssignError] = useState("");
+
+  // Assignment status updates
+  const [statusUpdating, setStatusUpdating] = useState(null);
+  const [statusError, setStatusError] = useState("");
 
   // Student enrollment
   const [showEnrollForm, setShowEnrollForm] = useState(false);
@@ -217,6 +233,27 @@ export default function CoursePage() {
 
   function updateRubricRow(idx, field, value) {
     setRubric(rubric.map((r, i) => (i === idx ? { ...r, [field]: value } : r)));
+  }
+
+  // --- Update assignment status ---
+  async function updateAssignmentStatus(assignmentId, newStatus) {
+    setStatusUpdating(assignmentId);
+    setStatusError("");
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("assignments")
+      .update({ status: newStatus, updated_at: new Date().toISOString() })
+      .eq("id", assignmentId);
+    if (error) {
+      setStatusError(error.message);
+    } else {
+      setAssignments((prev) =>
+        prev.map((a) =>
+          a.id === assignmentId ? { ...a, status: newStatus } : a,
+        ),
+      );
+    }
+    setStatusUpdating(null);
   }
 
   // --- Enroll student ---
@@ -578,23 +615,71 @@ export default function CoursePage() {
             ยังไม่มีงาน กด &quot;สร้างงาน&quot; เพื่อเริ่มต้น
           </p>
         ) : (
-          <div className="space-y-2">
-            {assignments.map((a) => (
-              <Link
-                key={a.id}
-                href={`/teacher/assignments/${a.id}`}
-                className="flex justify-between items-center bg-white rounded-lg border px-4 py-3 hover:shadow-sm hover:border-blue-300 transition-all"
-              >
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{a.title}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    คะแนนรวม {Number(a.max_score).toFixed(0)} คะแนน
-                  </p>
+          <>
+            {statusError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2 mb-3 text-sm text-red-600">
+                {statusError}
+              </div>
+            )}
+            <div className="space-y-2">
+              {assignments.map((a) => (
+                <div
+                  key={a.id}
+                  className="flex justify-between items-center bg-white rounded-lg border px-4 py-3 hover:shadow-sm hover:border-blue-300 transition-all"
+                >
+                  {/* Left: title + score + status badge */}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {a.title}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        คะแนนรวม {Number(a.max_score).toFixed(0)} คะแนน
+                      </p>
+                    </div>
+                    <span
+                      className={`inline-flex items-center shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${
+                        ASSIGN_STATUS_COLOR[a.status] ??
+                        "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      {ASSIGN_STATUS_LABEL[a.status] ?? a.status}
+                    </span>
+                  </div>
+
+                  {/* Right: status action button + manage link */}
+                  <div className="flex items-center gap-2 shrink-0 ml-3">
+                    {a.status === "draft" && (
+                      <button
+                        onClick={() =>
+                          updateAssignmentStatus(a.id, "published")
+                        }
+                        disabled={statusUpdating === a.id}
+                        className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md disabled:opacity-50 transition-colors"
+                      >
+                        {statusUpdating === a.id ? "..." : "เผยแพร่"}
+                      </button>
+                    )}
+                    {a.status === "published" && (
+                      <button
+                        onClick={() => updateAssignmentStatus(a.id, "closed")}
+                        disabled={statusUpdating === a.id}
+                        className="text-xs bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1.5 rounded-md disabled:opacity-50 transition-colors"
+                      >
+                        {statusUpdating === a.id ? "..." : "ปิดรับงาน"}
+                      </button>
+                    )}
+                    <Link
+                      href={`/teacher/assignments/${a.id}`}
+                      className="text-blue-500 hover:text-blue-700 text-sm"
+                    >
+                      จัดการ →
+                    </Link>
+                  </div>
                 </div>
-                <span className="text-blue-500 text-sm">จัดการ →</span>
-              </Link>
-            ))}
-          </div>
+              ))}
+            </div>
+          </>
         )}
       </section>
 

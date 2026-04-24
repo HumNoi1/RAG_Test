@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     chunk_overlap: int = 50
     top_k: int = 5
 
+    max_upload_mb: int = 20
+    llm_temperature: float = 0.2
+    max_context_chars: int = 8000
+
     class Config:
         env_file = ".env"
         extra = "ignore"
