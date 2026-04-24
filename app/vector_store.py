@@ -1,20 +1,22 @@
+import logging
+import uuid
+from functools import lru_cache
+
 from qdrant_client import QdrantClient
+from qdrant_client.http.exceptions import ResponseHandlingException, UnexpectedResponse
 from qdrant_client.models import (
     Distance,
     FieldCondition,
     Filter,
+    FilterSelector,
     MatchValue,
     PointStruct,
     ScoredPoint,
     VectorParams,
 )
-from qdrant_client.http.exceptions import ResponseHandlingException, UnexpectedResponse
+
 from app.config import get_settings
 from app.embeddings import get_embedding_dimension
-from functools import lru_cache
-import uuid
-import logging
-
 from app.models import MetadataValue
 
 logger = logging.getLogger(__name__)
@@ -171,6 +173,27 @@ def delete_collection(collection_name: str) -> bool:
         _raise_qdrant_error(exc)
     logger.info(f"Deleted collection '{collection_name}'")
     return True
+
+
+def delete_chunks_by_filter(
+    collection_name: str,
+    metadata_filters: dict[str, MetadataValue],
+) -> None:
+    """ลบ points ทั้งหมดใน Qdrant ที่ตรงกับ metadata filter (เช่น document_id)"""
+    if not metadata_filters:
+        raise ValueError("metadata_filters ต้องระบุอย่างน้อย 1 field")
+    client = get_qdrant_client()
+    query_filter = build_metadata_filter(metadata_filters)
+    try:
+        client.delete(
+            collection_name=collection_name,
+            points_selector=FilterSelector(filter=query_filter),
+        )
+    except (ResponseHandlingException, UnexpectedResponse) as exc:
+        _raise_qdrant_error(exc)
+    logger.info(
+        "Deleted chunks by filter %s from '%s'", metadata_filters, collection_name
+    )
 
 
 def get_collection_info(collection_name: str) -> dict:

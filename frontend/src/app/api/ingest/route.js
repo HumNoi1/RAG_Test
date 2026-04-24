@@ -1,8 +1,41 @@
 import { NextResponse } from "next/server";
+import crypto from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
 const RAG_API = process.env.NEXT_PUBLIC_RAG_API_URL ?? "http://localhost:8000";
+
+function computeMd5(buffer) {
+  return crypto.createHash("md5").update(Buffer.from(buffer)).digest("hex");
+}
+
+async function purgeOldDocument(supabase, serviceClient, oldDoc) {
+  // 1. ลบ Qdrant chunks (best-effort)
+  try {
+    const params = new URLSearchParams({
+      collection_name: oldDoc.qdrant_collection,
+      document_id: oldDoc.id,
+    });
+    await fetch(`${RAG_API}/documents/chunks?${params}`, {
+      method: "DELETE",
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (err) {
+    console.warn("[ingest] purge Qdrant chunks failed:", err.message);
+  }
+
+  // 2. ลบ Storage file (best-effort)
+  try {
+    await serviceClient.storage
+      .from("knowledge-files")
+      .remove([oldDoc.storage_path]);
+  } catch (err) {
+    console.warn("[ingest] purge storage file failed:", err.message);
+  }
+
+  // 3. ลบ DB record
+  await supabase.from("knowledge_documents").delete().eq("id", oldDoc.id);
+}
 
 export async function POST(request) {
   // ── Auth ───────────────────────────────────────────────────────────────
@@ -33,8 +66,26 @@ export async function POST(request) {
     );
   }
 
-  const storagePath = `${courseId}/${Date.now()}-${file.name}`;
   const fileBuffer = await file.arrayBuffer();
+  const md5Hash = computeMd5(fileBuffer);
+
+  // ── ตรวจ duplicate: same MD5 + same course ──────────────────────────────
+  const serviceClient = createServiceClient();
+  const { data: dupDoc } = await supabase
+    .from("knowledge_documents")
+    .select("id, storage_path, qdrant_collection")
+    .eq("course_id", courseId)
+    .eq("md5_hash", md5Hash)
+    .maybeSingle();
+
+  if (dupDoc) {
+    console.log(
+      `[ingest] duplicate MD5 ${md5Hash} — purging old doc ${dupDoc.id}`,
+    );
+    await purgeOldDocument(supabase, serviceClient, dupDoc);
+  }
+
+  const storagePath = `${courseId}/${Date.now()}-${file.name}`;
 
   // ── 1. Insert DB record ────────────────────────────────────────────────
   const { data: doc, error: insertError } = await supabase
@@ -47,6 +98,7 @@ export async function POST(request) {
       storage_path: storagePath,
       mime_type: file.type || "text/plain",
       file_size_bytes: fileBuffer.byteLength,
+      md5_hash: md5Hash,
       qdrant_collection: process.env.QDRANT_COLLECTION ?? "rag_demo_bge_m3",
       ingest_status: "pending",
       uploaded_by: user.id,
@@ -63,7 +115,6 @@ export async function POST(request) {
   }
 
   // ── 2. Upload Storage (service role — bypass storage RLS entirely) ─────
-  const serviceClient = createServiceClient();
   const { error: storageError } = await serviceClient.storage
     .from("knowledge-files")
     .upload(storagePath, fileBuffer, {
@@ -156,4 +207,67 @@ export async function POST(request) {
       { status: 500 },
     );
   }
+}
+
+// ── DELETE /api/ingest?documentId=xxx ──────────────────────────────────────
+export async function DELETE(request) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { searchParams } = new URL(request.url);
+  const documentId = searchParams.get("documentId");
+  if (!documentId) {
+    return NextResponse.json({ error: "documentId required" }, { status: 400 });
+  }
+
+  // ── ตรวจว่า doc นี้เป็นของ teacher คนนี้ (RLS ช่วยกรองอยู่แล้ว) ──────────
+  const { data: doc, error: fetchError } = await supabase
+    .from("knowledge_documents")
+    .select("id, storage_path, qdrant_collection")
+    .eq("id", documentId)
+    .single();
+
+  if (fetchError || !doc) {
+    return NextResponse.json({ error: "Document not found" }, { status: 404 });
+  }
+
+  // ── 1. ลบ Qdrant chunks (best-effort) ────────────────────────────────────
+  try {
+    const params = new URLSearchParams({
+      collection_name: doc.qdrant_collection,
+      document_id: doc.id,
+    });
+    await fetch(`${RAG_API}/documents/chunks?${params}`, {
+      method: "DELETE",
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (err) {
+    console.warn("[ingest DELETE] Qdrant cleanup failed:", err.message);
+  }
+
+  // ── 2. ลบ Storage file (best-effort) ─────────────────────────────────────
+  const serviceClient = createServiceClient();
+  try {
+    await serviceClient.storage
+      .from("knowledge-files")
+      .remove([doc.storage_path]);
+  } catch (err) {
+    console.warn("[ingest DELETE] Storage cleanup failed:", err.message);
+  }
+
+  // ── 3. ลบ DB record ───────────────────────────────────────────────────────
+  const { error: deleteError } = await supabase
+    .from("knowledge_documents")
+    .delete()
+    .eq("id", documentId);
+
+  if (deleteError) {
+    return NextResponse.json({ error: deleteError.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
 }

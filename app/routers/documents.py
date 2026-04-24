@@ -1,6 +1,6 @@
 import json
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 
 from app.models import ExtractTextResponse, IngestRequest, IngestResponse
 from app.rag_pipeline import ingest_text
@@ -9,6 +9,7 @@ from app.vector_store import (
     CollectionDimensionMismatchError,
     CollectionNotFoundError,
     QdrantUnavailableError,
+    delete_chunks_by_filter,
     delete_collection,
     get_collection_info,
 )
@@ -30,7 +31,9 @@ def _extract_or_raise(content: bytes, filename: str) -> tuple[str, str]:
     except UnsupportedFileTypeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"ไม่สามารถอ่านข้อความจากไฟล์ '{filename}' ได้: {exc}") from exc
+        raise HTTPException(
+            status_code=400, detail=f"ไม่สามารถอ่านข้อความจากไฟล์ '{filename}' ได้: {exc}"
+        ) from exc
 
 
 def _parse_metadata(metadata: str | None) -> dict:
@@ -40,7 +43,9 @@ def _parse_metadata(metadata: str | None) -> dict:
     try:
         parsed = json.loads(metadata)
     except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=400, detail="metadata ต้องเป็น JSON object") from exc
+        raise HTTPException(
+            status_code=400, detail="metadata ต้องเป็น JSON object"
+        ) from exc
 
     if not isinstance(parsed, dict):
         raise HTTPException(status_code=400, detail="metadata ต้องเป็น JSON object")
@@ -48,15 +53,25 @@ def _parse_metadata(metadata: str | None) -> dict:
     normalized = {}
     for key, value in parsed.items():
         if not isinstance(value, (str, int, float, bool)):
-            raise HTTPException(status_code=400, detail="metadata values ต้องเป็น string, number หรือ boolean")
+            raise HTTPException(
+                status_code=400,
+                detail="metadata values ต้องเป็น string, number หรือ boolean",
+            )
         normalized[str(key)] = value
     return normalized
 
 
-@router.post("/extract-text", response_model=ExtractTextResponse, summary="แปลงไฟล์เป็นข้อความ")
-async def extract_text(file: UploadFile = File(..., description="ไฟล์ .txt, .pdf หรือ .docx")):
+@router.post(
+    "/extract-text", response_model=ExtractTextResponse, summary="แปลงไฟล์เป็นข้อความ"
+)
+async def extract_text(
+    file: UploadFile = File(..., description="ไฟล์ .txt, .pdf หรือ .docx"),
+):
     if not file.filename:
-        raise HTTPException(status_code=400, detail="ต้องส่งไฟล์ผ่าน multipart/form-data โดยใช้ field ชื่อ 'file'")
+        raise HTTPException(
+            status_code=400,
+            detail="ต้องส่งไฟล์ผ่าน multipart/form-data โดยใช้ field ชื่อ 'file'",
+        )
 
     content = await file.read()
     text, file_type = _extract_or_raise(content, file.filename)
@@ -72,11 +87,19 @@ async def extract_text(file: UploadFile = File(..., description="ไฟล์ .t
     )
 
 
-@router.post("/upload-and-ingest", response_model=IngestResponse, summary="อัปโหลด .txt/.pdf/.docx แล้ว embed เข้า Qdrant")
+@router.post(
+    "/upload-and-ingest",
+    response_model=IngestResponse,
+    summary="อัปโหลด .txt/.pdf/.docx แล้ว embed เข้า Qdrant",
+)
 async def upload_and_ingest(
-    file: UploadFile | None = File(None, description="ไฟล์ .txt, .pdf หรือ .docx ที่ต้องการ ingest"),
+    file: UploadFile | None = File(
+        None, description="ไฟล์ .txt, .pdf หรือ .docx ที่ต้องการ ingest"
+    ),
     collection_name: str | None = None,
-    metadata: str | None = Form(None, description="JSON object ของ metadata เช่น {\"course_id\":\"c1\"}"),
+    metadata: str | None = Form(
+        None, description='JSON object ของ metadata เช่น {"course_id":"c1"}'
+    ),
 ):
     if file is None or not file.filename:
         raise HTTPException(
@@ -88,7 +111,9 @@ async def upload_and_ingest(
     text, file_type = _extract_or_raise(content, file.filename)
 
     if not text.strip():
-        raise HTTPException(status_code=400, detail="ไฟล์ว่างเปล่าหรือไม่พบข้อความที่ extract ได้")
+        raise HTTPException(
+            status_code=400, detail="ไฟล์ว่างเปล่าหรือไม่พบข้อความที่ extract ได้"
+        )
 
     parsed_metadata = _parse_metadata(metadata)
     parsed_metadata["file_type"] = file_type
@@ -111,7 +136,11 @@ async def upload_and_ingest(
     )
 
 
-@router.post("/ingest-text", response_model=IngestResponse, summary="ส่งข้อความตรงๆ แล้ว embed เข้า Qdrant")
+@router.post(
+    "/ingest-text",
+    response_model=IngestResponse,
+    summary="ส่งข้อความตรงๆ แล้ว embed เข้า Qdrant",
+)
 async def ingest_raw_text(
     body: IngestRequest,
     text: str = "",
@@ -147,6 +176,24 @@ async def collection_info(collection_name: str):
         return info
     except CollectionNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except QdrantUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.delete("/chunks", summary="ลบ chunks ใน Qdrant ของ document หนึ่งๆ")
+async def delete_document_chunks(
+    collection_name: str = Query(..., description="ชื่อ Qdrant collection"),
+    document_id: str = Query(..., description="document_id ที่ต้องการลบ chunks"),
+):
+    """ลบ points ทั้งหมดใน Qdrant ที่มี document_id ตรงกัน"""
+    try:
+        delete_chunks_by_filter(collection_name, {"document_id": document_id})
+        return {
+            "message": f"ลบ chunks ของ document '{document_id}' ออกจาก '{collection_name}' สำเร็จ"
+        }
+    except CollectionNotFoundError:
+        # collection ไม่มีอยู่ = ไม่มี chunks อยู่แล้ว ไม่ถือว่า error
+        return {"message": f"Collection '{collection_name}' ไม่มีอยู่ — ข้ามการลบ"}
     except QdrantUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
