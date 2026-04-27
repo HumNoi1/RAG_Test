@@ -1,6 +1,7 @@
 import logging
 import uuid
 from functools import lru_cache
+from typing import NoReturn
 
 from qdrant_client import AsyncQdrantClient, QdrantClient
 from qdrant_client.http.exceptions import ResponseHandlingException, UnexpectedResponse
@@ -10,6 +11,7 @@ from qdrant_client.models import (
     Filter,
     FilterSelector,
     MatchValue,
+    PayloadSchemaType,
     PointStruct,
     ScoredPoint,
     VectorParams,
@@ -36,7 +38,9 @@ class CollectionDimensionMismatchError(RuntimeError):
     """Raised when the active embedding model does not match collection vector size."""
 
 
-def _raise_qdrant_error(exc: ResponseHandlingException | UnexpectedResponse) -> None:
+def _raise_qdrant_error(
+    exc: ResponseHandlingException | UnexpectedResponse,
+) -> NoReturn:
     if isinstance(exc, ResponseHandlingException):
         raise QdrantUnavailableError(
             "Qdrant ไม่พร้อมใช้งานหรือยังไม่ได้รันที่ปลายทางที่ตั้งค่าไว้"
@@ -87,10 +91,63 @@ def get_qdrant_client() -> QdrantClient:
     return client
 
 
+def _create_payload_indexes(client: QdrantClient, collection_name: str) -> None:
+    """สร้าง keyword indexes บน document_id และ source เพื่อให้ filter/delete เร็วขึ้น"""
+    try:
+        client.create_payload_index(
+            collection_name=collection_name,
+            field_name="document_id",
+            field_schema=PayloadSchemaType.KEYWORD,
+        )
+        client.create_payload_index(
+            collection_name=collection_name,
+            field_name="source",
+            field_schema=PayloadSchemaType.KEYWORD,
+        )
+        logger.info(
+            "Created payload indexes on 'document_id' and 'source' for '%s'",
+            collection_name,
+        )
+    except Exception as idx_exc:
+        logger.warning(
+            "Could not create payload indexes for '%s': %s", collection_name, idx_exc
+        )
+
+
+async def _create_payload_indexes_async(
+    client: AsyncQdrantClient, collection_name: str
+) -> None:
+    """Async: สร้าง keyword indexes บน document_id และ source"""
+    try:
+        await client.create_payload_index(
+            collection_name=collection_name,
+            field_name="document_id",
+            field_schema=PayloadSchemaType.KEYWORD,
+        )
+        await client.create_payload_index(
+            collection_name=collection_name,
+            field_name="source",
+            field_schema=PayloadSchemaType.KEYWORD,
+        )
+        logger.info(
+            "Created payload indexes on 'document_id' and 'source' for '%s'",
+            collection_name,
+        )
+    except Exception as idx_exc:
+        logger.warning(
+            "Could not create payload indexes for '%s': %s", collection_name, idx_exc
+        )
+
+
 def ensure_collection(collection_name: str) -> None:
     """สร้าง collection ถ้ายังไม่มี"""
+    # Fast-path: collection ถูก validate แล้ว = มีอยู่และ dims ถูกต้อง ข้ามทุก I/O
+    if collection_name in _validated_collections:
+        return
+
     client = get_qdrant_client()
     dim = get_embedding_dimension()
+    existing: list[str] = []
     try:
         existing = [c.name for c in client.get_collections().collections]
     except (ResponseHandlingException, UnexpectedResponse) as exc:
@@ -103,10 +160,13 @@ def ensure_collection(collection_name: str) -> None:
                 vectors_config=VectorParams(size=dim, distance=Distance.COSINE),
             )
             logger.info(f"Created collection '{collection_name}' with dim={dim}")
+            _create_payload_indexes(client, collection_name)
         except UnexpectedResponse as exc:
             if exc.status_code == 409:
                 # Race condition: another request created it concurrently
-                logger.info(f"Collection '{collection_name}' already created concurrently")
+                logger.info(
+                    f"Collection '{collection_name}' already created concurrently"
+                )
                 _validate_collection_dimension(collection_name, dim)
             else:
                 _raise_qdrant_error(exc)
@@ -162,6 +222,7 @@ def search_similar(
     client = get_qdrant_client()
     _validate_collection_dimension(collection_name, len(query_vector))
     query_filter = build_metadata_filter(metadata_filters)
+    results: list[ScoredPoint] = []
     try:
         results = client.search(
             collection_name=collection_name,
@@ -209,9 +270,32 @@ def delete_chunks_by_filter(
     )
 
 
+async def delete_chunks_by_filter_async(
+    collection_name: str,
+    metadata_filters: dict[str, MetadataValue],
+) -> None:
+    """Async: ลบ points ทั้งหมดใน Qdrant ที่ตรงกับ metadata filter"""
+    if not metadata_filters:
+        raise ValueError("metadata_filters ต้องระบุอย่างน้อย 1 field")
+    client = get_async_qdrant_client()
+    query_filter = build_metadata_filter(metadata_filters)
+    try:
+        await client.delete(
+            collection_name=collection_name,
+            points_selector=FilterSelector(filter=query_filter),
+        )
+    except (ResponseHandlingException, UnexpectedResponse) as exc:
+        _raise_qdrant_error(exc)
+    logger.info(
+        "Async deleted chunks by filter %s from '%s'", metadata_filters, collection_name
+    )
+
+
 def get_collection_info(collection_name: str) -> dict:
     """ดูข้อมูลของ collection"""
     info = _get_collection_details(collection_name)
+    if info is None:
+        raise CollectionNotFoundError(f"ไม่พบ collection '{collection_name}'")
     return {
         "name": collection_name,
         "vectors_count": info.vectors_count,
@@ -274,8 +358,13 @@ async def _validate_collection_dimension_async(
 
 async def ensure_collection_async(collection_name: str) -> None:
     """Async: สร้าง collection ถ้ายังไม่มี"""
+    # Fast-path: collection ถูก validate แล้ว = มีอยู่และ dims ถูกต้อง ข้ามทุก I/O
+    if collection_name in _validated_collections:
+        return
+
     client = get_async_qdrant_client()
     dim = get_embedding_dimension()
+    existing: list[str] = []
     try:
         collections_response = await client.get_collections()
         existing = [c.name for c in collections_response.collections]
@@ -289,10 +378,13 @@ async def ensure_collection_async(collection_name: str) -> None:
                 vectors_config=VectorParams(size=dim, distance=Distance.COSINE),
             )
             logger.info(f"Created collection '{collection_name}' with dim={dim}")
+            await _create_payload_indexes_async(client, collection_name)
         except UnexpectedResponse as exc:
             if exc.status_code == 409:
                 # Race condition: another request created it concurrently
-                logger.info(f"Collection '{collection_name}' already created concurrently")
+                logger.info(
+                    f"Collection '{collection_name}' already created concurrently"
+                )
                 await _validate_collection_dimension_async(collection_name, dim)
             else:
                 _raise_qdrant_error(exc)
@@ -310,7 +402,7 @@ async def upsert_chunks_async(
     source: str,
     metadata: dict[str, MetadataValue] | None = None,
 ) -> int:
-    """Async: บันทึก chunks พร้อม vectors เข้า Qdrant"""
+    """Async: บันทึก chunks พร้อม vectors เข้า Qdrant แบบ batched"""
     client = get_async_qdrant_client()
     await ensure_collection_async(collection_name)
     base_metadata = metadata or {}
@@ -329,8 +421,18 @@ async def upsert_chunks_async(
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings))
     ]
 
+    batch_size = get_settings().upsert_batch_size
     try:
-        await client.upsert(collection_name=collection_name, points=points)
+        for i in range(0, len(points), batch_size):
+            batch = points[i : i + batch_size]
+            await client.upsert(collection_name=collection_name, points=batch)
+            if len(points) > batch_size:
+                logger.info(
+                    "Upserted batch %d/%d into '%s'",
+                    min(i + batch_size, len(points)),
+                    len(points),
+                    collection_name,
+                )
     except (ResponseHandlingException, UnexpectedResponse) as exc:
         _raise_qdrant_error(exc)
     logger.info(f"Upserted {len(points)} chunks into '{collection_name}'")
@@ -348,6 +450,7 @@ async def search_similar_async(
     client = get_async_qdrant_client()
     await _validate_collection_dimension_async(collection_name, len(query_vector))
     query_filter = build_metadata_filter(metadata_filters)
+    results: list[ScoredPoint] = []
     try:
         results = await client.search(
             collection_name=collection_name,

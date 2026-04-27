@@ -15,9 +15,7 @@ from app.models import (
     RubricCriterionScore,
 )
 from app.vector_store import (
-    CollectionDimensionMismatchError,
-    CollectionNotFoundError,
-    QdrantUnavailableError,
+    delete_chunks_by_filter_async,
     search_similar_async,
     upsert_chunks_async,
 )
@@ -55,7 +53,8 @@ def chunk_text(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
 
     for para in paragraphs:
         if len(para) > chunk_size:
-            sentences = re.split(r"(?<=[.!?ๆฯ])\s+", para)
+            sentences = re.split(r"(?<=[.!?])\s+|(?<=[ๆฯ])\s*(?=[ก-๙A-Za-z\"])", para)
+            sentences = [s for s in sentences if s.strip()]
             for sentence in sentences:
                 if len(current) + len(sentence) <= chunk_size:
                     current += (" " if current else "") + sentence
@@ -103,6 +102,23 @@ async def ingest_text(
     text_hash = hashlib.md5(text.encode("utf-8")).hexdigest()
     enriched_metadata = dict(metadata or {})
     enriched_metadata["text_hash"] = text_hash
+
+    existing_doc_id = enriched_metadata.get("document_id")
+    if existing_doc_id:
+        try:
+            await delete_chunks_by_filter_async(
+                collection,
+                {"document_id": str(existing_doc_id)},
+            )
+            logger.info(
+                "Replaced existing chunks for document_id='%s'", existing_doc_id
+            )
+        except Exception as exc:
+            logger.debug(
+                "Could not delete old chunks for document_id='%s': %s",
+                existing_doc_id,
+                exc,
+            )
 
     stored = await upsert_chunks_async(
         collection, chunks, embeddings, source, enriched_metadata
@@ -209,14 +225,23 @@ async def rag_with_llm_stream(
             yield content, model_name
 
 
+# Fields ที่ไม่ควรส่งให้ LLM — เป็น internal metadata ไม่มีประโยชน์ต่อการตอบคำถาม
+_CONTEXT_EXCLUDED_KEYS: frozenset[str] = frozenset(
+    {"document_id", "text_hash", "file_type"}
+)
+
+
 def build_context(chunks: list[RetrievedChunk]) -> str:
     """รวม chunks เป็น context string สำหรับส่งให้ LLM"""
     parts = []
     for i, chunk in enumerate(chunks, 1):
         metadata_text = ""
-        if chunk.metadata:
+        visible_meta = {
+            k: v for k, v in chunk.metadata.items() if k not in _CONTEXT_EXCLUDED_KEYS
+        }
+        if visible_meta:
             metadata_text = (
-                f", metadata: {json.dumps(chunk.metadata, ensure_ascii=False)}"
+                f", metadata: {json.dumps(visible_meta, ensure_ascii=False)}"
             )
         parts.append(
             f"[{i}] (source: {chunk.source}, chunk_index: {chunk.chunk_index}, score: {chunk.score}{metadata_text})\n{chunk.text}"
@@ -228,7 +253,10 @@ def truncate_context(context: str, max_chars: int) -> str:
     """ตัด context ให้ไม่เกิน max_chars โดยตัดจากท้าย"""
     if len(context) <= max_chars:
         return context
-    return context[:max_chars].rsplit("\n\n---\n\n", 1)[0] + "\n\n---\n\n[... context truncated due to length ...]"
+    return (
+        context[:max_chars].rsplit("\n\n---\n\n", 1)[0]
+        + "\n\n---\n\n[... context truncated due to length ...]"
+    )
 
 
 def _build_retrieved_chunk(payload: dict, score: float) -> RetrievedChunk:

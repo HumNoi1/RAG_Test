@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
 
 from app.models import GradeRequest, GradeResponse
 from app.rag_pipeline import MissingLLMApiKeyError, grade_submission

@@ -1,10 +1,12 @@
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-from app.routers import documents, grading, query
-from app.embeddings import get_embedding_model
+
 from app.config import get_settings
-import logging
+from app.embeddings import get_embedding_model
+from app.routers import documents, grading, query
 
 logging.basicConfig(
     level=logging.INFO,
@@ -50,9 +52,10 @@ Qdrant — running in Docker
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 app.include_router(documents.router)
@@ -76,6 +79,7 @@ async def root():
 @app.get("/health", tags=["Health"])
 async def health():
     from app.vector_store import get_async_qdrant_client
+
     try:
         client = get_async_qdrant_client()
         response = await client.get_collections()
@@ -86,4 +90,9 @@ async def health():
             "collections": collections,
         }
     except Exception as e:
-        return {"status": "degraded", "qdrant": f"error: {str(e)}"}
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(
+            status_code=503,
+            content={"status": "degraded", "qdrant": f"error: {str(e)}"},
+        )

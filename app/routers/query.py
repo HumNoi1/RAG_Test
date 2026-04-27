@@ -124,9 +124,9 @@ async def rag_query_stream(body: RAGRequest):
         try:
             async for content, model_name in rag_with_llm_stream(body.query, chunks):
                 yield f"data: {content}\n\n"
-            yield f"data: [DONE]\n\n"
+            yield "data: [DONE]\n\n"
         except MissingLLMApiKeyError:
-            yield f"data: ข้อผิดพลาด: ไม่มี GROQ_API_KEY\n\n"
+            yield "data: ข้อผิดพลาด: ไม่มี GROQ_API_KEY\n\n"
         except Exception as exc:
             yield f"data: ข้อผิดพลาด: {str(exc)}\n\n"
 

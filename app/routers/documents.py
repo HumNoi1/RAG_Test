@@ -1,8 +1,10 @@
 import json
 import uuid
+from typing import NoReturn
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 
+from app.config import get_settings
 from app.models import ExtractTextResponse, IngestRequest, IngestResponse
 from app.rag_pipeline import ingest_text
 from app.text_extraction import UnsupportedFileTypeError, extract_text_from_file
@@ -14,7 +16,6 @@ from app.vector_store import (
     delete_collection,
     get_collection_info,
 )
-from app.config import get_settings
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
@@ -23,7 +24,7 @@ def _get_max_upload_bytes() -> int:
     return get_settings().max_upload_mb * 1024 * 1024
 
 
-def _raise_storage_http_error(exc: Exception) -> None:
+def _raise_storage_http_error(exc: Exception) -> NoReturn:
     if isinstance(exc, CollectionDimensionMismatchError):
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if isinstance(exc, QdrantUnavailableError):
@@ -144,15 +145,15 @@ async def upload_and_ingest(
         )
     except (CollectionDimensionMismatchError, QdrantUnavailableError) as exc:
         _raise_storage_http_error(exc)
-
-    return IngestResponse(
-        message=f"Ingest สำเร็จ! เก็บ {stored} chunks จากไฟล์ '{file.filename}'",
-        chunks_stored=stored,
-        collection=collection,
-        source=file.filename,
-        document_id=doc_id,
-        metadata=parsed_metadata,
-    )
+    else:
+        return IngestResponse(
+            message=f"Ingest สำเร็จ! เก็บ {stored} chunks จากไฟล์ '{file.filename}'",
+            chunks_stored=stored,
+            collection=collection,
+            source=file.filename,
+            document_id=doc_id,
+            metadata=parsed_metadata,
+        )
 
 
 @router.post(
@@ -165,8 +166,9 @@ async def ingest_raw_text(
     collection_name: str | None = None,
 ):
     raw_text = body.text
-    if not raw_text.strip():
+    if not raw_text or not raw_text.strip():
         raise HTTPException(status_code=400, detail="text ว่างเปล่า")
+    assert raw_text is not None  # narrow type for linter
 
     body_metadata = dict(body.metadata)
     doc_id = body.document_id or str(
@@ -183,15 +185,15 @@ async def ingest_raw_text(
         )
     except (CollectionDimensionMismatchError, QdrantUnavailableError) as exc:
         _raise_storage_http_error(exc)
-
-    return IngestResponse(
-        message=f"Ingest สำเร็จ! เก็บ {stored} chunks",
-        chunks_stored=stored,
-        collection=collection,
-        source=body.source_name or "raw_input",
-        document_id=doc_id,
-        metadata=body_metadata,
-    )
+    else:
+        return IngestResponse(
+            message=f"Ingest สำเร็จ! เก็บ {stored} chunks",
+            chunks_stored=stored,
+            collection=collection,
+            source=body.source_name or "raw_input",
+            document_id=doc_id,
+            metadata=body_metadata,
+        )
 
 
 @router.get("/collection/{collection_name}", summary="ดูข้อมูล collection")

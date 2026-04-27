@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     chunk_size: int = 1200
     chunk_overlap: int = 150
     top_k: int = 5
+    embedding_batch_size: int = 32  # จำนวน texts ที่ encode พร้อมกันใน 1 batch
+    upsert_batch_size: int = 100  # จำนวน points ที่ upsert เข้า Qdrant ใน 1 batch
+
+    cors_origins: list[str] = ["http://localhost:3000"]
 
     max_upload_mb: int = 20
     llm_temperature: float = 0.2

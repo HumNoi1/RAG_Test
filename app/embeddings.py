@@ -1,7 +1,9 @@
 import asyncio
 import logging
 from functools import lru_cache
+from typing import cast
 
+import torch
 from sentence_transformers import SentenceTransformer
 
 from app.config import get_settings
@@ -13,10 +15,26 @@ _embedding_semaphore = asyncio.Semaphore(MAX_CONCURRENT_EMBEDDINGS)
 
 
 @lru_cache
+def _get_device() -> str:
+    """ตรวจสอบ hardware ที่ดีที่สุดสำหรับ embedding model"""
+    if torch.cuda.is_available():
+        logger.info("Embedding device: CUDA (GPU)")
+        return "cuda"
+    if torch.backends.mps.is_available():
+        logger.info("Embedding device: MPS (Apple Silicon)")
+        return "mps"
+    logger.info("Embedding device: CPU")
+    return "cpu"
+
+
+@lru_cache
 def get_embedding_model() -> SentenceTransformer:
     settings = get_settings()
-    logger.info(f"Loading embedding model: {settings.embedding_model}")
-    model = SentenceTransformer(settings.embedding_model)
+    device = _get_device()
+    logger.info(
+        f"Loading embedding model: {settings.embedding_model} on device: {device}"
+    )
+    model = SentenceTransformer(settings.embedding_model, device=device)
     logger.info(
         f"Model loaded. Embedding dimension: {model.get_sentence_embedding_dimension()}"
     )
@@ -24,10 +42,16 @@ def get_embedding_model() -> SentenceTransformer:
 
 
 def _encode_texts(texts: list[str]) -> list[list[float]]:
-    """CPU-bound: encode texts synchronously. Call only via to_thread or sync helpers."""
+    """CPU/GPU-bound: encode texts synchronously. Call only via to_thread or sync helpers."""
     model = get_embedding_model()
-    embeddings = model.encode(texts, show_progress_bar=False, normalize_embeddings=True)
-    return embeddings.tolist()
+    batch_size = get_settings().embedding_batch_size
+    embeddings = model.encode(
+        texts,
+        show_progress_bar=False,
+        normalize_embeddings=True,
+        batch_size=batch_size,
+    )
+    return cast(list[list[float]], embeddings.tolist())
 
 
 async def embed_texts(texts: list[str]) -> list[list[float]]:
@@ -57,4 +81,9 @@ def embed_query_sync(query: str) -> list[float]:
 
 
 def get_embedding_dimension() -> int:
-    return get_embedding_model().get_sentence_embedding_dimension()
+    dim = get_embedding_model().get_sentence_embedding_dimension()
+    if dim is None:
+        raise RuntimeError(
+            f"ไม่สามารถอ่าน embedding dimension จาก model '{get_settings().embedding_model}' ได้"
+        )
+    return dim
